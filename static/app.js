@@ -28,7 +28,7 @@ function renderChart(labels, values) {
       datasets: [{
         label: 'Wins',
         data: values,
-        backgroundColor: ['#1f77b4','#ff7f0e','#2ca02c']
+        backgroundColor: ['#e53e3e','#2b6cb0','#48bb78']
       }]
     },
     options: {
@@ -43,7 +43,7 @@ function showStatus(msg) { document.getElementById('status').textContent = msg; 
 function showStats(f1, f2, results) {
   const s = document.getElementById('stats');
   // Build a union of keys to show in table, in preferred order
-  const preferred = ['name','wins','losses','draws','total_bouts','ko_wins','win_rate','ko_rate','height','reach','weight','nationality','birth_location','source'];
+  const preferred = ['name','wins','losses','draws','total_bouts','ko_wins','win_rate','ko_rate','height','reach','weight','source'];
   const keys = new Set([...Object.keys(f1), ...Object.keys(f2), ...preferred]);
   const ordered = [...preferred, ...Array.from(keys).filter(k => !preferred.includes(k))];
 
@@ -86,30 +86,16 @@ function showStats(f1, f2, results) {
   const summary = document.createElement('div');
   summary.className = 'stats-summary';
   summary.innerHTML = `<strong>Results:</strong> ${results.results.fighter1_win_pct.toFixed(2)}% / ${results.results.fighter2_win_pct.toFixed(2)}% (Draws: ${results.results.draw_pct.toFixed(2)}%)`;
-  const dlBtn = document.createElement('button');
-  dlBtn.textContent = 'Download CSV';
-  dlBtn.type = 'button';
-  dlBtn.addEventListener('click', () => {
-    const csv = tableToCSV(table);
-    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `${(f1.name||'fighter1')}_vs_${(f2.name||'fighter2')}_stats.csv`;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-
   s.innerHTML = '';
   s.appendChild(summary);
   s.appendChild(table);
-  s.appendChild(dlBtn);
+  // CSV download removed per user request
 }
 
 function tableToCSV(table) {
   const rows = Array.from(table.querySelectorAll('tr'));
   return rows.map(r => Array.from(r.querySelectorAll('th,td')).map(c => '"' + c.textContent.replace(/"/g,'""') + '"').join(',')).join('\n');
 }
-}
-
 window.addEventListener('DOMContentLoaded', async () => {
   const fighters = await fetchFighters();
   populateSelect('fighter1', fighters, fighters[0]);
@@ -154,54 +140,4 @@ window.addEventListener('DOMContentLoaded', async () => {
       showStatus('Error: ' + err.message);
     }
   });
-
-  // Events button
-  const eventsBtn = document.getElementById('fetch-events');
-  const eventsList = document.getElementById('events-list');
-  if (eventsBtn) {
-    eventsBtn.addEventListener('click', async () => {
-      showStatus('Fetching upcoming events...');
-      try {
-        const res = await fetch('/api/events');
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        showStatus('Events fetched.');
-        renderEvents(data, eventsList);
-      } catch (err) {
-        showStatus('Error fetching events: ' + err.message);
-        eventsList.innerHTML = '<pre>' + (err.message || err) + '</pre>';
-      }
-    });
-  }
 });
-
-function renderEvents(resp, container) {
-  if (!container) return;
-  container.innerHTML = '';
-
-  const payload = resp && resp.data ? resp.data : resp;
-
-  // Try common shapes: payload.events (array) or payload (array/object)
-  let items = [];
-  if (Array.isArray(payload)) items = payload;
-  else if (payload && Array.isArray(payload.events)) items = payload.events;
-  else if (payload && Array.isArray(payload.data)) items = payload.data;
-  else if (payload && Array.isArray(payload.results)) items = payload.results;
-
-  if (items.length === 0) {
-    // Fallback: pretty-print the payload
-    container.innerHTML = '<pre>' + JSON.stringify(payload, null, 2) + '</pre>';
-    return;
-  }
-
-  const ul = document.createElement('ul');
-  items.forEach(it => {
-    const li = document.createElement('li');
-    // Try to display a friendly label (date + title)
-    const when = it.start_time || it.date || it.event_date || it.datetime || it.scheduled || it.begin || '';
-    const title = it.title || it.name || it.event || it.home_team || it.away_team || it.card || JSON.stringify(it);
-    li.textContent = (when ? when + ' — ' : '') + title;
-    ul.appendChild(li);
-  });
-  container.appendChild(ul);
-}

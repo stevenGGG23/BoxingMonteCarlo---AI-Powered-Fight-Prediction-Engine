@@ -29,9 +29,7 @@ def create_app():
     # Prefer the documented free/demo key '123' when no env var is set
     api_key = os.getenv('THESPORTSDB_API_KEY') or '123'
     api = BoxingAPI(api_key=api_key)
-    # RapidAPI key (optional). Set RAPIDAPI_KEY in your environment or in a .env file.
-    rapidapi_key = os.getenv('RAPIDAPI_KEY')
-    rapidapi_host = 'boxing-data-api.p.rapidapi.com'
+    # RapidAPI/events removed
 
     @app.route('/')
     def index():
@@ -42,38 +40,7 @@ def create_app():
     def list_fighters():
         return jsonify({'fighters': list(api.fighter_db.keys())})
 
-    @app.route('/api/events')
-    def rapid_events():
-        """Proxy endpoint to fetch scheduled boxing events from RapidAPI boxing-data-api.
-
-        Query params accepted (all optional): days, past_hours, date_sort, page_num, page_size
-        Example: /api/events?days=7&past_hours=12
-        """
-        if not rapidapi_key:
-            return jsonify({'error': 'RAPIDAPI_KEY not set in environment'}), 400
-
-        # Build parameters with sensible defaults
-        params = {
-            'days': request.args.get('days', '7'),
-            'past_hours': request.args.get('past_hours', '12'),
-            'date_sort': request.args.get('date_sort', 'ASC'),
-            'page_num': request.args.get('page_num', '1'),
-            'page_size': request.args.get('page_size', '25')
-        }
-
-        url = 'https://boxing-data-api.p.rapidapi.com/v1/events/schedule'
-        headers = {
-            'x-rapidapi-host': rapidapi_host,
-            'x-rapidapi-key': rapidapi_key
-        }
-
-        try:
-            resp = requests.get(url, headers=headers, params=params, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            return jsonify({'source': 'rapidapi', 'data': data})
-        except requests.exceptions.RequestException as e:
-            return jsonify({'error': 'RapidAPI request failed', 'detail': str(e)}), 502
+    # /api/events removed
 
 
     @app.route('/api/simulate', methods=['POST'])
@@ -126,9 +93,16 @@ def create_app():
             }
             warnings.append(f"Fighter 2 ('{f2}') not found; using estimated default stats.")
 
-        # Build DataFrames from validated stats
+        # Build DataFrames from validated stats and compute derived rates
         f1_df = pd.DataFrame([f1_stats])
         f2_df = pd.DataFrame([f2_stats])
+        # Ensure totals are safe (validate_stats already adjusts total_bouts)
+        for df in (f1_df, f2_df):
+            tb = df.at[0, 'total_bouts'] if 'total_bouts' in df.columns else 1
+            wins = df.at[0, 'wins'] if 'wins' in df.columns else 0
+            ko_wins = df.at[0, 'ko_wins'] if 'ko_wins' in df.columns else 0
+            df['win_rate'] = wins / tb if tb and tb > 0 else 0
+            df['ko_rate'] = ko_wins / tb if tb and tb > 0 else 0
 
         # Cap simulations for web responsiveness
         if n > 200_000:
@@ -294,6 +268,8 @@ class BoxingAPI:
                     print(f"  → Failed to decode JSON from {url}: {e}")
                     continue
 
+                # TheSportsDB returns 'player' containing a list
+                players = data.get('player') or data.get('players') or []
                 # Debug: show top-level keys received (helps diagnose format changes)
                 top_keys = list(data.keys()) if isinstance(data, dict) else []
                 print(f"  → API response keys from {url}: {top_keys}")
@@ -305,8 +281,6 @@ class BoxingAPI:
                     'players_returned': len(players) if isinstance(players, list) else 0
                 }]
 
-                # TheSportsDB returns 'player' containing a list
-                players = data.get('player') or data.get('players') or []
                 if players and len(players) > 0:
                     print(f"✓ Found fighter in TheSportsDB API via {url}")
                     return players[0]
