@@ -10,27 +10,36 @@
 <body>
   <div class="container">
     <h1>Boxing Monte Carlo — Visualizer</h1>
+    <p class="site-description">Enter two fighters (select from the list or type any fighter's full name) to run a Monte Carlo simulation predicting outcomes. Results include win percentages, draws, and a simple visualization.</p>
     <form id="sim-form">
       <div class="row">
         <label>Fighter 1</label>
         <select id="fighter1"></select>
+        <input id="fighter1_custom" type="text" placeholder="Or enter custom fighter name" />
       </div>
       <div class="row">
         <label>Fighter 2</label>
         <select id="fighter2"></select>
+        <input id="fighter2_custom" type="text" placeholder="Or enter custom fighter name" />
       </div>
       <div class="row">
         <label>Simulations</label>
         <input id="n_simulations" type="number" value="10000" min="1000" step="1000">
       </div>
-      <div class="row">
-        <label>Multiprocessing</label>
-        <input id="use_mp" type="checkbox" checked>
-      </div>
+      <!-- Multiprocessing is enabled by default; no user toggle provided -->
       <button type="submit">Run Simulation</button>
     </form>
 
     <div id="status" class="status"></div>
+
+    <div class="row">
+      <button id="fetch-events" type="button">Fetch Upcoming Events</button>
+    </div>
+
+    <section id="events" class="events">
+      <h2>Upcoming Events</h2>
+      <div id="events-list">No events loaded.</div>
+    </section>
 
     <div class="visual">
       <canvas id="resultChart" height="120"></canvas>
@@ -38,6 +47,12 @@
 
     <div id="stats" class="stats"></div>
   </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <small>Created by Steven Gobran, 2025</small>
+    </div>
+  </footer>
 
   <script src="/static/app.js"></script>
 </body>

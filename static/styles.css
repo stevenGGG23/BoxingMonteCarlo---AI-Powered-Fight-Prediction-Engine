@@ -11,4 +11,10 @@ button:hover{opacity:.95}
 .status{margin-top:12px;color:#333}
 .visual{margin-top:18px}
 .stats{margin-top:12px;background:#fbfbff;padding:12px;border-radius:6px;border:1px solid #f0f4ff}
+/* Excel-like table styling */
+.stats-table{width:100%;border-collapse:collapse;margin-top:8px}
+.stats-table th{background:#f1f5f9;padding:8px;border:1px solid #e6eef6;text-align:left}
+.stats-table td{padding:8px;border:1px solid #eef4fb}
+.stats-summary{margin-bottom:8px}
+.events{margin-top:18px}
 @media(max-width:640px){form{grid-template-columns:1fr}button{width:100%}}

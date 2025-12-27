@@ -26,8 +26,12 @@ def create_app():
     app = Flask(__name__, template_folder='templates', static_folder='static')
 
     # Initialize API (module-level) using env var or free tier
-    api_key = os.getenv('THESPORTSDB_API_KEY') or '3'
+    # Prefer the documented free/demo key '123' when no env var is set
+    api_key = os.getenv('THESPORTSDB_API_KEY') or '123'
     api = BoxingAPI(api_key=api_key)
+    # RapidAPI key (optional). Set RAPIDAPI_KEY in your environment or in a .env file.
+    rapidapi_key = os.getenv('RAPIDAPI_KEY')
+    rapidapi_host = 'boxing-data-api.p.rapidapi.com'
 
     @app.route('/')
     def index():
@@ -38,6 +42,40 @@ def create_app():
     def list_fighters():
         return jsonify({'fighters': list(api.fighter_db.keys())})
 
+    @app.route('/api/events')
+    def rapid_events():
+        """Proxy endpoint to fetch scheduled boxing events from RapidAPI boxing-data-api.
+
+        Query params accepted (all optional): days, past_hours, date_sort, page_num, page_size
+        Example: /api/events?days=7&past_hours=12
+        """
+        if not rapidapi_key:
+            return jsonify({'error': 'RAPIDAPI_KEY not set in environment'}), 400
+
+        # Build parameters with sensible defaults
+        params = {
+            'days': request.args.get('days', '7'),
+            'past_hours': request.args.get('past_hours', '12'),
+            'date_sort': request.args.get('date_sort', 'ASC'),
+            'page_num': request.args.get('page_num', '1'),
+            'page_size': request.args.get('page_size', '25')
+        }
+
+        url = 'https://boxing-data-api.p.rapidapi.com/v1/events/schedule'
+        headers = {
+            'x-rapidapi-host': rapidapi_host,
+            'x-rapidapi-key': rapidapi_key
+        }
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            return jsonify({'source': 'rapidapi', 'data': data})
+        except requests.exceptions.RequestException as e:
+            return jsonify({'error': 'RapidAPI request failed', 'detail': str(e)}), 502
+
+
     @app.route('/api/simulate', methods=['POST'])
     def api_simulate():
         payload = request.get_json() or {}
@@ -47,20 +85,46 @@ def create_app():
             n = int(payload.get('n_simulations', N))
         except Exception:
             n = N
-        use_mp = payload.get('use_multiprocessing', True)
+        # Multiprocessing is enabled by default server-side
+        use_mp = True
 
         if not f1 or not f2:
             return jsonify({'error': 'fighter1 and fighter2 required'}), 400
 
         # Validate fighters and provide clear error messages when data is missing
+        # Fetch fighter stats; if missing, create reasonable default estimates
+        warnings = []
         f1_stats = api.get_fighter_stats(f1)
         f2_stats = api.get_fighter_stats(f2)
         err1 = api.validate_stats(f1_stats)
         err2 = api.validate_stats(f2_stats)
         if err1:
-            return jsonify({'error': f"Fighter 1 ('{f1}') error: {err1}"}), 404
+            # Provide a safe default so users can simulate custom fighters by name
+            f1_stats = {
+                'name': f1,
+                'wins': 1,
+                'losses': 1,
+                'draws': 0,
+                'total_bouts': 2,
+                'ko_wins': 0,
+                'height': 180,
+                'reach': 180,
+                'weight': 170
+            }
+            warnings.append(f"Fighter 1 ('{f1}') not found; using estimated default stats.")
         if err2:
-            return jsonify({'error': f"Fighter 2 ('{f2}') error: {err2}"}), 404
+            f2_stats = {
+                'name': f2,
+                'wins': 1,
+                'losses': 1,
+                'draws': 0,
+                'total_bouts': 2,
+                'ko_wins': 0,
+                'height': 180,
+                'reach': 180,
+                'weight': 170
+            }
+            warnings.append(f"Fighter 2 ('{f2}') not found; using estimated default stats.")
 
         # Build DataFrames from validated stats
         f1_df = pd.DataFrame([f1_stats])
@@ -85,7 +149,12 @@ def create_app():
             'results': results,
             'fighter1': f1_df.iloc[0].to_dict(),
             'fighter2': f2_df.iloc[0].to_dict(),
-            'plot_url': plot_url
+            'plot_url': plot_url,
+            'warnings': warnings,
+            'api_search_debug': {
+                'fighter1': api.last_search_debug.get(f1, []),
+                'fighter2': api.last_search_debug.get(f2, [])
+            }
         }
         return jsonify(resp)
 
@@ -115,6 +184,7 @@ class BoxingAPI:
 
         # Fallback local database
         self.fighter_db = {
+            'Terence Crawford': {'wins': 42, 'losses': 0, 'draws': 0, 'total_bouts': 42, 'height': 178, 'reach': 183, 'ko_wins': 31, 'weight': 147},
             'Anthony Joshua': {'wins': 28, 'losses': 3, 'draws': 0, 'total_bouts': 31, 'height': 198, 'reach': 208, 'ko_wins': 25, 'weight': 240},
             'Jake Paul': {'wins': 9, 'losses': 1, 'draws': 0, 'total_bouts': 10, 'height': 185, 'reach': 193, 'ko_wins': 6, 'weight': 190},
             'Tyson Fury': {'wins': 34, 'losses': 0, 'draws': 1, 'total_bouts': 35, 'height': 206, 'reach': 216, 'ko_wins': 24, 'weight': 270},
@@ -122,6 +192,8 @@ class BoxingAPI:
             'Mike Tyson': {'wins': 50, 'losses': 6, 'draws': 0, 'total_bouts': 56, 'height': 178, 'reach': 180, 'ko_wins': 44, 'weight': 220},
             'Floyd Mayweather': {'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50, 'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147}
         }
+        # store debug info for last searches
+        self.last_search_debug = {}
 
     def _convert_height(self, height_str):
         """Convert height string to cm"""
@@ -188,27 +260,60 @@ class BoxingAPI:
     def search_fighter(self, fighter_name):
         """
         Search for fighter by name using TheSportsDB API (premium or free)
-        Falls back to local DB when API is unavailable or returns no data.
+        Try multiple endpoint variants and report response keys for better
+        compatibility. Do not silently fallback to local DB here.
         """
         print(f"\n🔍 Searching for fighter: {fighter_name}")
         try:
-            if self.is_premium:
-                url = f"{self.base_url}/all/searchplayers.php"
-                params = {"p": fighter_name}
-                response = requests.get(url, headers=self.headers, params=params, timeout=10)
-            else:
-                url = f"{self.base_url}/{self.api_key}/searchplayers.php"
-                params = {"p": fighter_name}
-                response = requests.get(url, params=params, timeout=10)
+            params = {"p": fighter_name}
 
-            response.raise_for_status()
-            data = response.json()
-            if data.get('player') and len(data['player']) > 0:
-                print(f"✓ Found fighter in TheSportsDB API")
-                return data['player'][0]
+            # Build candidate URLs to try (covers v1/v2 and presence/absence of key in path)
+            candidates = []
+            if self.is_premium:
+                candidates.append((f"{self.base_url}/searchplayers.php", True))
+                candidates.append((f"{self.base_url}/all/searchplayers.php", True))
             else:
-                print(f"⚠ Fighter not found in API, checking local database...")
-                return None
+                # v1: base_url already is https://www.thesportsdb.com/api/v1/json
+                candidates.append((f"{self.base_url}/{self.api_key}/searchplayers.php", False))
+                candidates.append((f"{self.base_url}/searchplayers.php", False))
+
+            for url, use_headers in candidates:
+                try:
+                    if use_headers:
+                        response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                    else:
+                        response = requests.get(url, params=params, timeout=10)
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    print(f"  → Request to {url} failed: {e}")
+                    continue
+
+                try:
+                    data = response.json()
+                except Exception as e:
+                    print(f"  → Failed to decode JSON from {url}: {e}")
+                    continue
+
+                # Debug: show top-level keys received (helps diagnose format changes)
+                top_keys = list(data.keys()) if isinstance(data, dict) else []
+                print(f"  → API response keys from {url}: {top_keys}")
+                # record debug info for this fighter
+                self.last_search_debug[fighter_name] = self.last_search_debug.get(fighter_name, []) + [{
+                    'url': url,
+                    'status_code': response.status_code,
+                    'top_keys': top_keys,
+                    'players_returned': len(players) if isinstance(players, list) else 0
+                }]
+
+                # TheSportsDB returns 'player' containing a list
+                players = data.get('player') or data.get('players') or []
+                if players and len(players) > 0:
+                    print(f"✓ Found fighter in TheSportsDB API via {url}")
+                    return players[0]
+
+            # No candidate returned results
+            print(f"⚠ Fighter not found in API after trying endpoints.")
+            return None
 
         except requests.exceptions.RequestException as e:
             print(f"⚠ API Error: {e}")
@@ -219,15 +324,14 @@ class BoxingAPI:
         """Return None if stats are sufficient, otherwise an error string."""
         if not stats:
             return "Fighter not found in API or local database."
-        total = stats.get('total_bouts', 0)
-        wins = stats.get('wins', 0)
-        losses = stats.get('losses', 0)
-        draws = stats.get('draws', 0)
-        ko_wins = stats.get('ko_wins', 0)
 
-        if total == 0 or (wins == 0 and losses == 0 and draws == 0 and ko_wins == 0):
-            return "Fighter has no bout records or all-zero stats."
+        # Ensure callers can safely divide by total_bouts; if it's zero, treat
+        # it as one (this happens when API returns a player but no bout records).
+        if stats.get('total_bouts', 0) == 0:
+            stats['total_bouts'] = 1
 
+        # Accept API-returned players even if their win/loss/draw counts are zero;
+        # simulation will use the provided (or defaulted) values.
         return None
     
     def get_fighter_stats(self, fighter_name):
@@ -256,19 +360,20 @@ class BoxingAPI:
                 
                 total_bouts = wins + losses + draws
 
-                # If API returns no bout data, prefer local DB when available
+                # If API returns no bout data, optionally fall back to local DB
+                # to use a curated record (useful for well-known fighters). Set
+                # env var USE_LOCAL_DB_FALLBACK=false to disable this behavior.
                 if total_bouts == 0:
-                    print("⚠ API returned no bout records. Checking local database for fallback...")
-                    if fighter_name in self.fighter_db:
-                        print("→ Using local database stats instead.")
+                    use_local_fallback = os.getenv('USE_LOCAL_DB_FALLBACK', 'true').lower() in ('1', 'true', 'yes')
+                    if use_local_fallback and fighter_name in self.fighter_db:
+                        print("⚠ API returned no bout records. Using local DB fallback for this fighter.")
                         stats = self.fighter_db[fighter_name].copy()
                         stats['name'] = fighter_name
+                        stats['source'] = 'local_db'
                         return stats
                     else:
-                        # Avoid division by zero later by assuming one bout (win/loss unknown)
-                        print("→ No local data available; using safe defaults to avoid division by zero.")
+                        print("⚠ API returned no bout records. Proceeding with API data and using safe defaults to avoid division by zero.")
                         total_bouts = 1
-                        # keep wins/losses/draws as 0 and ko_wins as 0
                 
                 stats = {
                     'name': player_data.get('strPlayer', fighter_name),
@@ -280,6 +385,7 @@ class BoxingAPI:
                     'height': height,
                     'reach': reach,
                     'weight': weight,
+                    'source': 'api',
                     'nationality': player_data.get('strNationality', 'Unknown'),
                     'birth_location': player_data.get('strBirthLocation', 'Unknown')
                 }
@@ -295,17 +401,16 @@ class BoxingAPI:
                 print(f"⚠ Error parsing API data: {e}")
                 print(f"→ Trying local database...")
         
-        # Fallback to local database
+        # No API data found. If local DB has an entry, use it as a fallback
+        # (useful offline or for curated fighters). Otherwise return None.
         if fighter_name in self.fighter_db:
-            print(f"✓ Loaded stats from local database")
+            print(f"⚠ No API data for '{fighter_name}'; using local DB fallback.")
             stats = self.fighter_db[fighter_name].copy()
             stats['name'] = fighter_name
+            stats['source'] = 'local_db'
             return stats
-        
-        print(f"✗ Fighter '{fighter_name}' not found!")
-        print(f"\nAvailable fighters in local database:")
-        for name in self.fighter_db.keys():
-            print(f"  • {name}")
+
+        print(f"✗ Fighter '{fighter_name}' not found in API or local DB.")
         return None
     
     def create_dataframe(self, fighter_name):
