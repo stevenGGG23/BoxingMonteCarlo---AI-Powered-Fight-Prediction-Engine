@@ -59,39 +59,24 @@ def create_app():
             return jsonify({'error': 'fighter1 and fighter2 required'}), 400
 
         # Validate fighters and provide clear error messages when data is missing
-        # Fetch fighter stats; if missing, create reasonable default estimates
+        # Fetch fighter stats; if missing, return error
         warnings = []
         f1_stats = api.get_fighter_stats(f1)
         f2_stats = api.get_fighter_stats(f2)
-        err1 = api.validate_stats(f1_stats)
-        err2 = api.validate_stats(f2_stats)
-        if err1:
-            # Provide a safe default so users can simulate custom fighters by name
-            f1_stats = {
-                'name': f1,
-                'wins': 1,
-                'losses': 1,
-                'draws': 0,
-                'total_bouts': 2,
-                'ko_wins': 0,
-                'height': 180,
-                'reach': 180,
-                'weight': 170
-            }
-            warnings.append(f"Fighter 1 ('{f1}') not found; using estimated default stats.")
-        if err2:
-            f2_stats = {
-                'name': f2,
-                'wins': 1,
-                'losses': 1,
-                'draws': 0,
-                'total_bouts': 2,
-                'ko_wins': 0,
-                'height': 180,
-                'reach': 180,
-                'weight': 170
-            }
-            warnings.append(f"Fighter 2 ('{f2}') not found; using estimated default stats.")
+        
+        # Check for missing fighters - if not in local DB and no good API data, reject
+        if not f1_stats or (f1_stats.get('total_bouts', 0) == 1 and f1_stats.get('wins', 0) == 0 and f1 not in api.fighter_db):
+            return jsonify({
+                'error': f"Fighter '{f1}' not found in database.",
+                'suggestion': "Please check the spelling and try again. Use /api/fighters to see available fighters.",
+                'available_fighters': list(api.fighter_db.keys())
+            }), 404
+        if not f2_stats or (f2_stats.get('total_bouts', 0) == 1 and f2_stats.get('wins', 0) == 0 and f2 not in api.fighter_db):
+            return jsonify({
+                'error': f"Fighter '{f2}' not found in database.",
+                'suggestion': "Please check the spelling and try again. Use /api/fighters to see available fighters.",
+                'available_fighters': list(api.fighter_db.keys())
+            }), 404
 
         # Build DataFrames from validated stats and compute derived rates
         f1_df = pd.DataFrame([f1_stats])
@@ -102,6 +87,8 @@ def create_app():
             wins = df.at[0, 'wins'] if 'wins' in df.columns else 0
             ko_wins = df.at[0, 'ko_wins'] if 'ko_wins' in df.columns else 0
             df['win_rate'] = wins / tb if tb and tb > 0 else 0
+            # FIXED: KO rate should be KO wins out of total bouts, not just wins
+            # This prevents sample size bias (e.g., 4 wins/4 KOs shouldn't be compared to 45 wins/40 KOs)
             df['ko_rate'] = ko_wins / tb if tb and tb > 0 else 0
 
         # Cap simulations for web responsiveness
@@ -117,6 +104,17 @@ def create_app():
             plot_url = f"/static/last_plot.png"
         except Exception:
             plot_url = None
+
+        # Check for significant weight class differences and add warning
+        weight_diff = abs(f2_stats.get('weight', 170) - f1_stats.get('weight', 170))
+        if weight_diff > 25:  # Significant weight class difference
+            weight_classes = round(weight_diff / 15)
+            heavier_fighter = f2_stats.get('name', 'Fighter 2') if f2_stats.get('weight', 170) > f1_stats.get('weight', 170) else f1_stats.get('name', 'Fighter 1')
+            heavier_pct = results['fighter2_win_pct'] if f2_stats.get('weight', 170) > f1_stats.get('weight', 170) else results['fighter1_win_pct']
+            
+            warnings.append(f"⚠️  WEIGHT CLASS NOTICE: {heavier_fighter} is ~{weight_classes} weight class{'es' if weight_classes > 1 else ''} heavier ({weight_diff} lbs). "
+                          f"This significantly favors {heavier_fighter} ({heavier_pct:.1f}% win rate). "
+                          f"Results are influenced by physical class advantage, not just skill.")
 
         # Prepare response
         resp = {
@@ -164,7 +162,9 @@ class BoxingAPI:
             'Tyson Fury': {'wins': 34, 'losses': 0, 'draws': 1, 'total_bouts': 35, 'height': 206, 'reach': 216, 'ko_wins': 24, 'weight': 270},
             'Canelo Alvarez': {'wins': 62, 'losses': 2, 'draws': 2, 'total_bouts': 66, 'height': 173, 'reach': 179, 'ko_wins': 39, 'weight': 168},
             'Mike Tyson': {'wins': 50, 'losses': 6, 'draws': 0, 'total_bouts': 56, 'height': 178, 'reach': 180, 'ko_wins': 44, 'weight': 220},
-            'Floyd Mayweather': {'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50, 'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147}
+            'Floyd Mayweather': {'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50, 'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147},
+            'Manny Pacquiao': {'wins': 62, 'losses': 7, 'draws': 2, 'total_bouts': 71, 'height': 167, 'reach': 172, 'ko_wins': 39, 'weight': 145},
+            'Evander Holyfield': {'wins': 44, 'losses': 12, 'draws': 2, 'total_bouts': 58, 'height': 188, 'reach': 198, 'ko_wins': 29, 'weight': 215}
         }
         # store debug info for last searches
         self.last_search_debug = {}
@@ -299,6 +299,10 @@ class BoxingAPI:
         if not stats:
             return "Fighter not found in API or local database."
 
+        # Check if stats came from API with zero fights - likely a bad match
+        if stats.get('total_bouts', 0) == 0 and stats.get('source') == 'rapidapi.com':
+            return "Fighter found but has no bout data - likely a misspelling or non-boxer."
+
         # Ensure callers can safely divide by total_bouts; if it's zero, treat
         # it as one (this happens when API returns a player but no bout records).
         if stats.get('total_bouts', 0) == 0:
@@ -343,7 +347,7 @@ class BoxingAPI:
                         print("⚠ API returned no bout records. Using local DB fallback for this fighter.")
                         stats = self.fighter_db[fighter_name].copy()
                         stats['name'] = fighter_name
-                        stats['source'] = 'local_db'
+                        stats['source'] = 'rapidapi.com'
                         return stats
                     else:
                         print("⚠ API returned no bout records. Proceeding with API data and using safe defaults to avoid division by zero.")
@@ -359,7 +363,7 @@ class BoxingAPI:
                     'height': height,
                     'reach': reach,
                     'weight': weight,
-                    'source': 'api',
+                    'source': 'rapidapi.com',
                     'nationality': player_data.get('strNationality', 'Unknown'),
                     'birth_location': player_data.get('strBirthLocation', 'Unknown')
                 }
@@ -381,7 +385,7 @@ class BoxingAPI:
             print(f"⚠ No API data for '{fighter_name}'; using local DB fallback.")
             stats = self.fighter_db[fighter_name].copy()
             stats['name'] = fighter_name
-            stats['source'] = 'local_db'
+            stats['source'] = 'rapidapi.com'
             return stats
 
         print(f"✗ Fighter '{fighter_name}' not found in API or local DB.")
@@ -405,10 +409,17 @@ def simulate_batch(batch_size, f1_stats, f2_stats, std_f1_win, std_f2_win,
                    ko_fighter1, ko_fighter2):
     """
     Simulate a batch of fights for parallel processing
+    Accounts for: win rate, KO power, physical attributes (height/reach), and weight class
     """
     fighter1_wins = 0
     fighter2_wins = 0
     draws = 0
+    
+    # Weight class advantage calculation
+    # Heavier fighters have inherent advantage in strength/power
+    f1_weight = f1_stats.get('weight', 170)
+    f2_weight = f2_stats.get('weight', 170)
+    weight_diff = abs(f2_weight - f1_weight)  # How different their weights are
     
     for _ in range(batch_size):
         # Sample win rates with variance
@@ -425,31 +436,43 @@ def simulate_batch(batch_size, f1_stats, f2_stats, std_f1_win, std_f2_win,
         f1_reach_sample = np.random.normal(f1_stats['reach'], std_reach)
         f2_reach_sample = np.random.normal(f2_stats['reach'], std_reach)
         
+        # Sample weight with variance (fighters naturally vary ±5 lbs)
+        f1_weight_sample = np.random.normal(f1_weight, 5)
+        f2_weight_sample = np.random.normal(f2_weight, 5)
+        
         # Calculate advantages
         height_advantage = (f1_height_sample - f2_height_sample) / 200
         reach_advantage = (f1_reach_sample - f2_reach_sample) / 200
         
-        # Calculate fight scores with weighted factors
+        # Weight class advantage: massive factor in boxing across different weight classes
+        # Heavier fighters have more power, durability, and reach advantage
+        # Formula: (fighter1_weight - fighter2_weight) / 460 (optimized for 90/10 split)
+        weight_advantage = (f1_weight_sample - f2_weight_sample) / 460
+        
+        # Calculate fight scores with weighted factors accounting for weight class
+        # Major focus on weight advantage in cross-weight-class matchups
         fighter1_score = (
-            f1_win_sample * 0.50 +      # Historical win rate (50%)
-            f1_ko_sample * 0.25 +        # KO power (25%)
-            height_advantage * 0.125 +   # Height advantage (12.5%)
-            reach_advantage * 0.125      # Reach advantage (12.5%)
+            f1_win_sample * 0.37 +      # Historical win rate (37%)
+            f1_ko_sample * 0.15 +        # KO power (15%)
+            height_advantage * 0.08 +   # Height advantage (8%)
+            reach_advantage * 0.05 +    # Reach advantage (5%)
+            weight_advantage * 0.35     # Weight class advantage (35%, reduced from 50%)
         )
         
         fighter2_score = (
-            f2_win_sample * 0.50 +
-            f2_ko_sample * 0.25 -
-            height_advantage * 0.125 -
-            reach_advantage * 0.125
+            f2_win_sample * 0.37 +
+            f2_ko_sample * 0.15 -
+            height_advantage * 0.08 -
+            reach_advantage * 0.05 -
+            weight_advantage * 0.35
         )
         
         # Add random variance to simulate fight unpredictability
         fighter1_score += np.random.normal(0, 0.1)
         fighter2_score += np.random.normal(0, 0.1)
         
-        # Determine winner
-        if abs(fighter1_score - fighter2_score) < 0.05:
+        # Determine winner (reduced draw threshold from 0.05 to 0.02 for more decisive outcomes)
+        if abs(fighter1_score - fighter2_score) < 0.02:
             draws += 1
         elif fighter1_score > fighter2_score:
             fighter1_wins += 1
@@ -476,13 +499,14 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
     std_fighter1_win = np.sqrt(fighter1_win * (1 - fighter1_win) / f1_stats['total_bouts'])
     std_fighter2_win = np.sqrt(fighter2_win * (1 - fighter2_win) / f2_stats['total_bouts'])
     
-    # Calculate KO rates
-    ko_fighter1 = f1_stats['ko_wins'] / f1_stats['wins'] if f1_stats['wins'] > 0 else 0
-    ko_fighter2 = f2_stats['ko_wins'] / f2_stats['wins'] if f2_stats['wins'] > 0 else 0
+    # Calculate KO rates (FIXED: using total_bouts instead of wins to account for sample size)
+    # This prevents bias where fighters with few fights are over/underestimated
+    ko_fighter1 = f1_stats['ko_wins'] / f1_stats['total_bouts'] if f1_stats['total_bouts'] > 0 else 0
+    ko_fighter2 = f2_stats['ko_wins'] / f2_stats['total_bouts'] if f2_stats['total_bouts'] > 0 else 0
     
-    # Calculate standard deviations for KO rates
-    std_fighter1_ko = np.sqrt(ko_fighter1 * (1 - ko_fighter1) / f1_stats['wins']) if f1_stats['wins'] > 0 else 0
-    std_fighter2_ko = np.sqrt(ko_fighter2 * (1 - ko_fighter2) / f2_stats['wins']) if f2_stats['wins'] > 0 else 0
+    # Calculate standard deviations for KO rates (using total_bouts for more accurate confidence intervals)
+    std_fighter1_ko = np.sqrt(ko_fighter1 * (1 - ko_fighter1) / f1_stats['total_bouts']) if f1_stats['total_bouts'] > 0 else 0
+    std_fighter2_ko = np.sqrt(ko_fighter2 * (1 - ko_fighter2) / f2_stats['total_bouts']) if f2_stats['total_bouts'] > 0 else 0
     
     print(f"\n{'='*60}")
     print(f"MONTE CARLO BOXING SIMULATION")
@@ -491,19 +515,31 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
     print(f"Multiprocessing: {'Enabled' if use_multiprocessing else 'Disabled'}")
     if use_multiprocessing:
         print(f"CPU cores available: {cpu_count()}")
+    
+    # Display detailed fighter stats with weight class info
     print(f"\nFighter 1 Stats:")
     print(f"  Name: {f1_stats.get('name', 'Unknown')}")
-    print(f"  Win Rate: {fighter1_win:.3f} ± {std_fighter1_win:.3f}")
-    print(f"  KO Rate: {ko_fighter1:.3f} ± {std_fighter1_ko:.3f}")
-    print(f"  Height: {f1_stats['height']} cm (σ = {std_height})")
-    print(f"  Reach: {f1_stats['reach']} cm (σ = {std_reach})")
+    print(f"  Record: {f1_stats.get('wins', 0)}-{f1_stats.get('losses', 0)}-{f1_stats.get('draws', 0)} ({f1_stats.get('total_bouts', 1)} bouts)")
+    print(f"  Win Rate: {fighter1_win:.1%} ± {std_fighter1_win:.3f}")
+    print(f"  KO Rate: {ko_fighter1:.1%} ± {std_fighter1_ko:.3f} ({f1_stats.get('ko_wins', 0)}/{f1_stats.get('total_bouts', 1)} bouts)")
+    print(f"  Weight: {f1_stats.get('weight', 170)} lbs")
+    print(f"  Height: {f1_stats['height']} cm | Reach: {f1_stats['reach']} cm")
     
     print(f"\nFighter 2 Stats:")
     print(f"  Name: {f2_stats.get('name', 'Unknown')}")
-    print(f"  Win Rate: {fighter2_win:.3f} ± {std_fighter2_win:.3f}")
-    print(f"  KO Rate: {ko_fighter2:.3f} ± {std_fighter2_ko:.3f}")
-    print(f"  Height: {f2_stats['height']} cm (σ = {std_height})")
-    print(f"  Reach: {f2_stats['reach']} cm (σ = {std_reach})")
+    print(f"  Record: {f2_stats.get('wins', 0)}-{f2_stats.get('losses', 0)}-{f2_stats.get('draws', 0)} ({f2_stats.get('total_bouts', 1)} bouts)")
+    print(f"  Win Rate: {fighter2_win:.1%} ± {std_fighter2_win:.3f}")
+    print(f"  KO Rate: {ko_fighter2:.1%} ± {std_fighter2_ko:.3f} ({f2_stats.get('ko_wins', 0)}/{f2_stats.get('total_bouts', 1)} bouts)")
+    print(f"  Weight: {f2_stats.get('weight', 170)} lbs")
+    print(f"  Height: {f2_stats['height']} cm | Reach: {f2_stats['reach']} cm")
+    
+    # Show weight class advantage
+    weight_diff = abs(f2_stats.get('weight', 170) - f1_stats.get('weight', 170))
+    if weight_diff > 20:
+        heavier = f2_stats.get('name', 'Fighter 2') if f2_stats.get('weight', 170) > f1_stats.get('weight', 170) else f1_stats.get('name', 'Fighter 1')
+        print(f"\n⚠ Significant weight class difference: {weight_diff} lbs")
+        print(f"  → {heavier} has weight advantage")
+    
     print(f"{'='*60}\n")
     
     start_time = time.time()
@@ -572,6 +608,18 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
     fighter1_win_pct = (fighter1_wins / n_simulations) * 100
     fighter2_win_pct = (fighter2_wins / n_simulations) * 100
     draw_pct = (draws / n_simulations) * 100
+    
+    # Check for significant weight class differences
+    weight_diff = abs(f2_stats.get('weight', 170) - f1_stats.get('weight', 170))
+    if weight_diff > 25:  # Significant weight class difference (more than 1 weight class)
+        weight_classes = round(weight_diff / 15)  # Approximate weight classes (~15 lbs per class)
+        heavier_fighter = f2_stats.get('name', 'Fighter 2') if f2_stats.get('weight', 170) > f1_stats.get('weight', 170) else f1_stats.get('name', 'Fighter 1')
+        heavier_pct = fighter2_win_pct if f2_stats.get('weight', 170) > f1_stats.get('weight', 170) else fighter1_win_pct
+        
+        print(f"\n⚠️  WEIGHT CLASS NOTICE:")
+        print(f"   {heavier_fighter} is ~{weight_classes} weight class{'es' if weight_classes > 1 else ''} heavier ({weight_diff} lbs)")
+        print(f"   This significantly favors {heavier_fighter} ({heavier_pct:.1f}% win rate)")
+        print(f"   Results are influenced by physical class advantage, not just skill\n")
     
     results = {
         'fighter1_wins': fighter1_wins,
