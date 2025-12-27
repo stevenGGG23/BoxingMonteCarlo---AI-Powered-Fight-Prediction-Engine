@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Boxing Monte Carlo — Visualizer</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Boxing Monte Carlo — Visualizer</h1>
+    <form id="sim-form">
+      <div class="row">
+        <label>Fighter 1</label>
+        <select id="fighter1"></select>
+      </div>
+      <div class="row">
+        <label>Fighter 2</label>
+        <select id="fighter2"></select>
+      </div>
+      <div class="row">
+        <label>Simulations</label>
+        <input id="n_simulations" type="number" value="10000" min="1000" step="1000">
+      </div>
+      <div class="row">
+        <label>Multiprocessing</label>
+        <input id="use_mp" type="checkbox" checked>
+      </div>
+      <button type="submit">Run Simulation</button>
+    </form>
+
+    <div id="status" class="status"></div>
+
+    <div class="visual">
+      <canvas id="resultChart" height="120"></canvas>
+    </div>
+
+    <div id="stats" class="stats"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

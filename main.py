@@ -2,11 +2,13 @@ import requests
 import numpy as np
 import pandas as pd
 import os
+import time
+from multiprocessing import Pool, cpu_count
+from flask import Flask, render_template, request, jsonify
+
+# Optional: keep matplotlib for CLI plotting
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
-from multiprocessing import Pool, cpu_count
-from functools import partial
-import time
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -17,12 +19,81 @@ N = 100_000
 # Standard deviations for physical attributes
 std_height = 1
 std_reach = 1
+def create_app():
+    """Create and configure the Flask app that serves a small UI.
+    The API endpoints allow listing available fighters and running simulations.
+    """
+    app = Flask(__name__, template_folder='templates', static_folder='static')
+
+    # Initialize API (module-level) using env var or free tier
+    api_key = os.getenv('THESPORTSDB_API_KEY') or '3'
+    api = BoxingAPI(api_key=api_key)
+
+    @app.route('/')
+    def index():
+        # Render the UI; JS will fetch fighters and submit simulation requests
+        return render_template('index.html')
+
+    @app.route('/api/fighters')
+    def list_fighters():
+        return jsonify({'fighters': list(api.fighter_db.keys())})
+
+    @app.route('/api/simulate', methods=['POST'])
+    def api_simulate():
+        payload = request.get_json() or {}
+        f1 = payload.get('fighter1') or payload.get('fighter1_name')
+        f2 = payload.get('fighter2') or payload.get('fighter2_name')
+        try:
+            n = int(payload.get('n_simulations', N))
+        except Exception:
+            n = N
+        use_mp = payload.get('use_multiprocessing', True)
+
+        if not f1 or not f2:
+            return jsonify({'error': 'fighter1 and fighter2 required'}), 400
+
+        # Validate fighters and provide clear error messages when data is missing
+        f1_stats = api.get_fighter_stats(f1)
+        f2_stats = api.get_fighter_stats(f2)
+        err1 = api.validate_stats(f1_stats)
+        err2 = api.validate_stats(f2_stats)
+        if err1:
+            return jsonify({'error': f"Fighter 1 ('{f1}') error: {err1}"}), 404
+        if err2:
+            return jsonify({'error': f"Fighter 2 ('{f2}') error: {err2}"}), 404
+
+        # Build DataFrames from validated stats
+        f1_df = pd.DataFrame([f1_stats])
+        f2_df = pd.DataFrame([f2_stats])
+
+        # Cap simulations for web responsiveness
+        if n > 200_000:
+            n = 200_000
+
+        results = monte_carlo_simulation(f1_df, f2_df, n_simulations=n, use_multiprocessing=use_mp)
+
+        # Save a server-side matplotlib PNG for quick preview
+        try:
+            plot_path = os.path.join('static', 'last_plot.png')
+            save_plot_png(results, f1, f2, plot_path)
+            plot_url = f"/static/last_plot.png"
+        except Exception:
+            plot_url = None
+
+        # Prepare response
+        resp = {
+            'results': results,
+            'fighter1': f1_df.iloc[0].to_dict(),
+            'fighter2': f2_df.iloc[0].to_dict(),
+            'plot_url': plot_url
+        }
+        return jsonify(resp)
+
+    return app
+
 
 class BoxingAPI:
-    """
-    Boxing API wrapper using TheSportsDB API
-    Supports both free tier (v1) and premium tier (v2) with API key
-    """
+    """Boxing API wrapper and local fallback database."""
     def __init__(self, api_key=None):
         # Check if premium API key is provided
         if api_key and api_key not in ['3', '123']:
@@ -37,79 +108,21 @@ class BoxingAPI:
         else:
             # Free tier - use API key 123
             self.base_url = "https://www.thesportsdb.com/api/v1/json"
-            self.api_key = api_key or '123'  # Updated to 123
+            self.api_key = api_key or '123'
             self.is_premium = False
             self.headers = {}
             print(f"\n🔌 Initialized TheSportsDB API (Free - v1, Key: {self.api_key})")
-        
-        # Fallback local database if API fails
+
+        # Fallback local database
         self.fighter_db = {
-            'Anthony Joshua': {
-                'wins': 28, 'losses': 3, 'draws': 0,
-                'total_bouts': 31, 'height': 198,
-                'reach': 208, 'ko_wins': 25, 'weight': 240
-            },
-            'Jake Paul': {
-                'wins': 9, 'losses': 1, 'draws': 0,
-                'total_bouts': 10, 'height': 185,
-                'reach': 193, 'ko_wins': 6, 'weight': 190
-            },
-            'Tyson Fury': {
-                'wins': 34, 'losses': 0, 'draws': 1,
-                'total_bouts': 35, 'height': 206,
-                'reach': 216, 'ko_wins': 24, 'weight': 270
-            },
-            'Canelo Alvarez': {
-                'wins': 62, 'losses': 2, 'draws': 2,
-                'total_bouts': 66, 'height': 173,
-                'reach': 179, 'ko_wins': 39, 'weight': 168
-            },
-            'Mike Tyson': {
-                'wins': 50, 'losses': 6, 'draws': 0,
-                'total_bouts': 56, 'height': 178,
-                'reach': 180, 'ko_wins': 44, 'weight': 220
-            },
-            'Floyd Mayweather': {
-                'wins': 50, 'losses': 0, 'draws': 0,
-                'total_bouts': 50, 'height': 173,
-                'reach': 183, 'ko_wins': 27, 'weight': 147
-            }
+            'Anthony Joshua': {'wins': 28, 'losses': 3, 'draws': 0, 'total_bouts': 31, 'height': 198, 'reach': 208, 'ko_wins': 25, 'weight': 240},
+            'Jake Paul': {'wins': 9, 'losses': 1, 'draws': 0, 'total_bouts': 10, 'height': 185, 'reach': 193, 'ko_wins': 6, 'weight': 190},
+            'Tyson Fury': {'wins': 34, 'losses': 0, 'draws': 1, 'total_bouts': 35, 'height': 206, 'reach': 216, 'ko_wins': 24, 'weight': 270},
+            'Canelo Alvarez': {'wins': 62, 'losses': 2, 'draws': 2, 'total_bouts': 66, 'height': 173, 'reach': 179, 'ko_wins': 39, 'weight': 168},
+            'Mike Tyson': {'wins': 50, 'losses': 6, 'draws': 0, 'total_bouts': 56, 'height': 178, 'reach': 180, 'ko_wins': 44, 'weight': 220},
+            'Floyd Mayweather': {'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50, 'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147}
         }
-    
-    def search_fighter(self, fighter_name):
-        """
-        Search for fighter by name using TheSportsDB API
-        Supports both v1 (free) and v2 (premium) endpoints
-        """
-        print(f"\n🔍 Searching for fighter: {fighter_name}")
-        
-        try:
-            if self.is_premium:
-                # Premium v2 endpoint
-                url = f"{self.base_url}/all/searchplayers.php"
-                params = {"p": fighter_name}
-                response = requests.get(url, headers=self.headers, params=params, timeout=10)
-            else:
-                # Free v1 endpoint
-                url = f"{self.base_url}/{self.api_key}/searchplayers.php"
-                params = {"p": fighter_name}
-                response = requests.get(url, params=params, timeout=10)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('player') and len(data['player']) > 0:
-                print(f"✓ Found fighter in TheSportsDB API")
-                return data['player'][0]
-            else:
-                print(f"⚠ Fighter not found in API, checking local database...")
-                return None
-                
-        except requests.exceptions.RequestException as e:
-            print(f"⚠ API Error: {e}")
-            print(f"→ Falling back to local database...")
-            return None
-    
+
     def _convert_height(self, height_str):
         """Convert height string to cm"""
         if not height_str:
@@ -171,6 +184,51 @@ class BoxingAPI:
         Average reach is approximately equal to height
         """
         return height_cm
+
+    def search_fighter(self, fighter_name):
+        """
+        Search for fighter by name using TheSportsDB API (premium or free)
+        Falls back to local DB when API is unavailable or returns no data.
+        """
+        print(f"\n🔍 Searching for fighter: {fighter_name}")
+        try:
+            if self.is_premium:
+                url = f"{self.base_url}/all/searchplayers.php"
+                params = {"p": fighter_name}
+                response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            else:
+                url = f"{self.base_url}/{self.api_key}/searchplayers.php"
+                params = {"p": fighter_name}
+                response = requests.get(url, params=params, timeout=10)
+
+            response.raise_for_status()
+            data = response.json()
+            if data.get('player') and len(data['player']) > 0:
+                print(f"✓ Found fighter in TheSportsDB API")
+                return data['player'][0]
+            else:
+                print(f"⚠ Fighter not found in API, checking local database...")
+                return None
+
+        except requests.exceptions.RequestException as e:
+            print(f"⚠ API Error: {e}")
+            print(f"→ Falling back to local database...")
+            return None
+
+    def validate_stats(self, stats):
+        """Return None if stats are sufficient, otherwise an error string."""
+        if not stats:
+            return "Fighter not found in API or local database."
+        total = stats.get('total_bouts', 0)
+        wins = stats.get('wins', 0)
+        losses = stats.get('losses', 0)
+        draws = stats.get('draws', 0)
+        ko_wins = stats.get('ko_wins', 0)
+
+        if total == 0 or (wins == 0 and losses == 0 and draws == 0 and ko_wins == 0):
+            return "Fighter has no bout records or all-zero stats."
+
+        return None
     
     def get_fighter_stats(self, fighter_name):
         """
@@ -494,6 +552,26 @@ def plot_results(results, fighter1_name, fighter2_name):
     return fig
 
 
+def save_plot_png(results, fighter1_name, fighter2_name, filepath):
+    """Save a simple matplotlib bar chart of the results to `filepath`."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    labels = [fighter1_name, fighter2_name, 'Draws']
+    values = [results['fighter1_wins'], results['fighter2_wins'], results['draws']]
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+    bars = ax.bar(labels, values, color=colors)
+    ax.set_ylabel('Wins')
+    ax.set_title('Monte Carlo Simulation Results')
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    for bar in bars:
+        h = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., h, f"{int(h):,}", ha='center', va='bottom')
+    fig.tight_layout()
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath)
+    plt.close(fig)
+
+
 def print_results(results, fighter1_name, fighter2_name):
     """
     Print detailed simulation results
@@ -619,5 +697,16 @@ def main():
     print("="*60 + "\n")
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    import sys
+    # Default: run web UI. Pass `cli` to run the interactive CLI instead.
+    if len(sys.argv) > 1 and sys.argv[1] == 'cli':
+        main()
+    else:
+        app = create_app()
+        # Allow overriding via environment variable `PORT`, default to 5001 to avoid conflicts
+        try:
+            port = int(os.getenv('PORT', '5001'))
+        except Exception:
+            port = 5001
+        app.run(host='0.0.0.0', port=port, debug=True)
