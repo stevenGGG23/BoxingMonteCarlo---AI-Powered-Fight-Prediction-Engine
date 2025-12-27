@@ -2,53 +2,70 @@
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=flat&logo=numpy&logoColor=white)](https://numpy.org/)
-[![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=flat&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
 
-A sophisticated Monte Carlo simulation engine that predicts boxing match outcomes using statistical modeling, probability theory, and machine learning techniques. Powered by multiprocessing for lightning-fast predictions across millions of simulated fights.
+BoxingMonteCarlo is a Monte Carlo simulation engine that predicts boxing match outcomes using statistical modeling and multiprocessing. The application queries online boxing data (TheSportsDB) and — when the sports API returns no structured player data — searches RapidAPI's boxing events schedule as a fallback to detect recently announced fighters.
 
 ## Overview
 
-BoxingMonteCarlo leverages advanced computational statistics to model fight outcomes with inherent uncertainty. By running 100,000+ simulated fights with randomized parameters, the system generates probabilistic predictions based on historical performance, physical attributes, and knockout power.
+By running many simulated fights (default: 100,000), the system generates probabilistic predictions using historical records, physical attributes, and knockout statistics. The project supports a small curated local fighter database as an optional fallback.
 
+## Key changes (this branch)
 
-## Features
-
-- **🔢 Monte Carlo Simulation**: Run 100,000+ fight simulations in seconds
-- **⚡ Multi-threaded Processing**: Parallel computing using Python's multiprocessing
-- **📈 Statistical Modeling**: Binomial distribution for win rate variance
-- **🎲 Stochastic Modeling**: Random sampling with normal distributions
-- **📊 Data Visualization**: matplotlib charts showing outcome distributions
-- **🥊 Real Fighter Stats**: Historical records, physical measurements, KO statistics
-- **🧮 Advanced Metrics**: Standard deviation calculations for height, reach, and performance
+- The app now queries RapidAPI's boxing events schedule to detect fighters listed on upcoming cards when TheSportsDB returns no structured player data.
+- When a fighter is matched in the RapidAPI schedule, the app creates conservative default stats so simulations can run (`source: rapidapi.schedule`).
+- The curated `fighter_db` in `main.py` is used only when `USE_LOCAL_DB_FALLBACK` is enabled.
 
 ## Quick Start
 
 ### Prerequisites
 
 ```bash
-pip install numpy pandas matplotlib requests
+pip install -r requirements.txt
 ```
 
-### Installation
+### Run (web UI)
 
 ```bash
-git clone https://github.com/yourusername/BoxingMonteCarlo.git
-cd BoxingMonteCarlo
-python boxing_monte_carlo.py
+python main.py
 ```
 
-### Usage
+This starts the Flask web UI (default port 5001). The `/api/simulate` endpoint accepts fighters found via TheSportsDB or the RapidAPI schedule fallback.
+
+### Example (library usage)
 
 ```python
-from boxing_monte_carlo import BoxingAPI, monte_carlo_simulation
+from main import BoxingAPI, monte_carlo_simulation
 
-# Initialize API and load fighter data
-api = BoxingAPI()
+api = BoxingAPI(api_key=None)
 fighter1_df = api.create_dataframe("Anthony Joshua")
 fighter2_df = api.create_dataframe("Jake Paul")
+results = monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=100_000)
+```
 
-# Run simulation
+## Configuration & Environment Variables
+
+- `THESPORTSDB_API_KEY`: Optional API key for TheSportsDB. If not provided, the free-tier behavior is used.
+- `RAPIDAPI_KEY`: Optional RapidAPI key used to query the boxing events schedule. It's recommended you set your own key.
+- `USE_LOCAL_DB_FALLBACK`: Set to `false` to disable falling back to the curated `fighter_db` embedded in `main.py`. Default: `true`.
+
+## Project Structure
+
+```
+BoxingMonteCarlo/
+├── main.py                   # Flask app + CLI entrypoint and simulation engine
+├── README.md                 # This file
+├── requirements.txt          # Python dependencies
+├── templates/                # Flask templates (web UI)
+├── static/                   # Static assets (JS/CSS, plots)
+└── tests/                    # Unit tests
+```
+
+## Notes
+
+- The `/api/fighters` endpoint lists fighters present in the curated `fighter_db`. Fighters discovered via the RapidAPI schedule are accepted by `/api/simulate` even if they are not in the curated DB.
+- For production usage you should set `RAPIDAPI_KEY` and `THESPORTSDB_API_KEY` environment variables and consider disabling `USE_LOCAL_DB_FALLBACK`.
+
+**Disclaimer**: For educational and entertainment purposes only. Not financial or betting advice.
 results = monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=100_000)
 
 # Results: {'fighter1_win_pct': 56.23, 'fighter2_win_pct': 42.11, 'draw_pct': 1.66}

@@ -65,17 +65,19 @@ def create_app():
         f2_stats = api.get_fighter_stats(f2)
         
         # Check for missing fighters - if not in local DB and no good API data, reject
-        if not f1_stats or (f1_stats.get('total_bouts', 0) == 1 and f1_stats.get('wins', 0) == 0 and f1 not in api.fighter_db):
+        if not f1_stats:
             return jsonify({
-                'error': f"Fighter '{f1}' not found in database.",
-                'suggestion': "Please check the spelling and try again. Use /api/fighters to see available fighters.",
-                'available_fighters': list(api.fighter_db.keys())
+                'error': f"Fighter '{f1}' not found via API or schedule search.",
+                'suggestion': "Please check the spelling and try again.",
+                'available_fighters': list(api.fighter_db.keys()),
+                'debug': api.last_search_debug.get(f1, [])
             }), 404
-        if not f2_stats or (f2_stats.get('total_bouts', 0) == 1 and f2_stats.get('wins', 0) == 0 and f2 not in api.fighter_db):
+        if not f2_stats:
             return jsonify({
-                'error': f"Fighter '{f2}' not found in database.",
-                'suggestion': "Please check the spelling and try again. Use /api/fighters to see available fighters.",
-                'available_fighters': list(api.fighter_db.keys())
+                'error': f"Fighter '{f2}' not found via API or schedule search.",
+                'suggestion': "Please check the spelling and try again.",
+                'available_fighters': list(api.fighter_db.keys()),
+                'debug': api.last_search_debug.get(f2, [])
             }), 404
 
         # Build DataFrames from validated stats and compute derived rates
@@ -231,6 +233,16 @@ class BoxingAPI:
         """
         return height_cm
 
+    def _find_local_fighter_key(self, fighter_name):
+        """Return the exact key from `fighter_db` matching `fighter_name` (case-insensitive), or None."""
+        if not fighter_name:
+            return None
+        lname = fighter_name.strip().lower()
+        for key in self.fighter_db:
+            if key.lower() == lname:
+                return key
+        return None
+
     def search_fighter(self, fighter_name):
         """
         Search for fighter by name using TheSportsDB API (premium or free)
@@ -294,6 +306,155 @@ class BoxingAPI:
             print(f"→ Falling back to local database...")
             return None
 
+    def search_rapidapi_schedule(self, fighter_name):
+        """
+        Search the RapidAPI boxing events schedule for a fighter name.
+        This is used as a fallback when TheSportsDB returns no player info
+        — it helps detect recently announced fighters on upcoming cards.
+        Returns a small dict when matched, otherwise None.
+        """
+        print(f"\n🔎 Searching RapidAPI schedule for: {fighter_name}")
+        # Allow override via env var RAPIDAPI_KEY; fall back to a bundled key if not set
+        rapid_key = os.getenv('RAPIDAPI_KEY') or '954b586842msha9c5947f76e426bp13b543jsnd28cc99ca940'
+        url = 'https://boxing-data-api.p.rapidapi.com/v1/events/schedule'
+        params = {'days': 7, 'past_hours': 12, 'date_sort': 'ASC', 'page_num': 1, 'page_size': 25}
+        headers = {
+            'x-rapidapi-host': 'boxing-data-api.p.rapidapi.com',
+            'x-rapidapi-key': rapid_key
+        }
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            print(f"  → RapidAPI schedule request failed: {e}")
+            # record debug and return None
+            self.last_search_debug[fighter_name] = self.last_search_debug.get(fighter_name, []) + [{
+                'source': 'rapidapi.schedule', 'error': str(e)
+            }]
+            return None
+
+        # Try to find the fighter name anywhere in the returned payload
+        def _find(obj):
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    if _find(v):
+                        return True
+            elif isinstance(obj, list):
+                for it in obj:
+                    if _find(it):
+                        return True
+            elif isinstance(obj, str):
+                if fighter_name.lower() in obj.lower():
+                    return True
+            return False
+
+        matched = _find(data)
+        self.last_search_debug[fighter_name] = self.last_search_debug.get(fighter_name, []) + [{
+            'source': 'rapidapi.schedule', 'matched': bool(matched)
+        }]
+
+        if matched:
+            print(f"✓ Found name in RapidAPI schedule payload — accepting as valid fighter (minimal data).")
+            return {'name': fighter_name, 'matched_event': True}
+
+        print(f"✗ No match for {fighter_name} in RapidAPI schedule payload.")
+        return None
+
+    def search_rapidapi_fighter_details(self, fighter_name):
+        """
+        Query the Boxing Data API (via RapidAPI) for detailed fighter profiles.
+        Try several candidate endpoints and parse the first reasonable result.
+        Returns a dict of raw API fields or None.
+        """
+        print(f"\n🔎 Searching RapidAPI fighter details for: {fighter_name}")
+        rapid_key = os.getenv('RAPIDAPI_KEY') or '954b586842msha9c5947f76e426bp13b543jsnd28cc99ca940'
+        base = 'https://boxing-data-api.p.rapidapi.com'
+
+        # Candidate endpoints and param names to try
+        candidates = [
+            (f"{base}/v1/fighters", {'search': fighter_name}),
+            (f"{base}/v1/fighters", {'q': fighter_name}),
+            (f"{base}/v1/boxers", {'search': fighter_name}),
+            (f"{base}/v1/fighter", {'search': fighter_name}),
+            (f"{base}/v1/fighters/search", {'name': fighter_name}),
+        ]
+
+        headers = {
+            'x-rapidapi-host': 'boxing-data-api.p.rapidapi.com',
+            'x-rapidapi-key': rapid_key
+        }
+
+        for url, params in candidates:
+            try:
+                resp = requests.get(url, headers=headers, params=params, timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as e:
+                # record debug and continue
+                self.last_search_debug[fighter_name] = self.last_search_debug.get(fighter_name, []) + [{
+                    'source': 'rapidapi.fighter_details', 'url': url, 'error': str(e)
+                }]
+                continue
+
+            # Record top-level keys for debugging
+            top_keys = list(data.keys()) if isinstance(data, dict) else []
+            self.last_search_debug[fighter_name] = self.last_search_debug.get(fighter_name, []) + [{
+                'source': 'rapidapi.fighter_details', 'url': url, 'top_keys': top_keys
+            }]
+
+            # Heuristics: look for lists under common keys
+            candidates_keys = []
+            if isinstance(data, dict):
+                for k in ('data', 'fighters', 'boxers', 'results', 'items'):
+                    v = data.get(k)
+                    if isinstance(v, list) and len(v) > 0:
+                        candidates_keys = v
+                        break
+
+                # Or if top-level appears to be a single fighter dict
+                if not candidates_keys:
+                    # sometimes API returns a single object with fighter fields
+                    # check for presence of name-like keys
+                    if any(k in data for k in ('name', 'fighter_name', 'fullName', 'first_name')):
+                        candidates_keys = [data]
+
+            # If we found potential fighter records, pick the first and normalize
+            if candidates_keys:
+                candidate = candidates_keys[0]
+                # Try to extract common fields
+                wins = int(candidate.get('wins', candidate.get('win', 0) or 0) or 0)
+                losses = int(candidate.get('losses', candidate.get('loss', 0) or 0) or 0)
+                draws = int(candidate.get('draws', candidate.get('ties', 0) or 0) or 0)
+                ko_wins = int(candidate.get('ko', candidate.get('kos', candidate.get('ko_wins', 0) or 0) or 0) or 0)
+
+                # Height and weight may be in various units/keys
+                height = candidate.get('height') or candidate.get('height_cm') or candidate.get('height_cm_display') or None
+                weight = candidate.get('weight') or candidate.get('weight_kg') or candidate.get('weight_lb') or None
+
+                nationality = candidate.get('nationality') or candidate.get('country') or candidate.get('country_name')
+                birth_location = candidate.get('birth_place') or candidate.get('birth_location') or candidate.get('hometown')
+
+                parsed = {
+                    'name': candidate.get('name') or candidate.get('fighter_name') or fighter_name,
+                    'wins': wins,
+                    'losses': losses,
+                    'draws': draws,
+                    'total_bouts': wins + losses + draws,
+                    'ko_wins': ko_wins,
+                    'height': self._convert_height(height),
+                    'reach': self._estimate_reach(self._convert_height(height)),
+                    'weight': self._convert_weight(weight),
+                    'source': 'rapidapi.fighter_details',
+                    'nationality': nationality or 'Unknown',
+                    'birth_location': birth_location or 'Unknown'
+                }
+                print(f"✓ Loaded fighter details from RapidAPI endpoint: {url}")
+                return parsed
+
+        print(f"✗ No detailed fighter profile found on RapidAPI for {fighter_name}.")
+        return None
+
     def validate_stats(self, stats):
         """Return None if stats are sufficient, otherwise an error string."""
         if not stats:
@@ -342,16 +503,50 @@ class BoxingAPI:
                 # to use a curated record (useful for well-known fighters). Set
                 # env var USE_LOCAL_DB_FALLBACK=false to disable this behavior.
                 if total_bouts == 0:
-                    use_local_fallback = os.getenv('USE_LOCAL_DB_FALLBACK', 'true').lower() in ('1', 'true', 'yes')
-                    if use_local_fallback and fighter_name in self.fighter_db:
-                        print("⚠ API returned no bout records. Using local DB fallback for this fighter.")
-                        stats = self.fighter_db[fighter_name].copy()
-                        stats['name'] = fighter_name
-                        stats['source'] = 'rapidapi.com'
+                    # If the API returns no bout records but we have a curated
+                    # local entry for this fighter, prefer the curated record
+                    # because it will be more accurate for well-known fighters.
+                    local_key = self._find_local_fighter_key(fighter_name)
+                    if local_key:
+                        print("⚠ API returned no bout records. Using local curated DB for this fighter.")
+                        stats = self.fighter_db[local_key].copy()
+                        stats['name'] = local_key
+                        stats['source'] = 'local_db'
                         return stats
-                    else:
-                        print("⚠ API returned no bout records. Proceeding with API data and using safe defaults to avoid division by zero.")
-                        total_bouts = 1
+
+                    use_local_fallback = os.getenv('USE_LOCAL_DB_FALLBACK', 'true').lower() in ('1', 'true', 'yes')
+                    if use_local_fallback:
+                        local_key = self._find_local_fighter_key(fighter_name)
+                        if local_key:
+                            print("⚠ API returned no bout records. Using local DB fallback for this fighter.")
+                            stats = self.fighter_db[local_key].copy()
+                            stats['name'] = local_key
+                            stats['source'] = 'local_db'
+                            return stats
+
+                    # If the API provides a player entry but zero bout counts,
+                    # try the RapidAPI schedule as a fallback before using
+                    # conservative safe defaults. This helps when TheSportsDB
+                    # contains a player stub but no bout history.
+                    schedule_match = self.search_rapidapi_schedule(fighter_name)
+                    if schedule_match:
+                        stats = {
+                            'name': fighter_name,
+                            'wins': 1,
+                            'losses': 0,
+                            'draws': 0,
+                            'total_bouts': 1,
+                            'ko_wins': 0,
+                            'height': 180,
+                            'reach': 180,
+                            'weight': 170,
+                            'source': 'rapidapi.schedule'
+                        }
+                        print(f"✓ Created minimal stats for '{fighter_name}' from RapidAPI schedule fallback.")
+                        return stats
+
+                    print("⚠ API returned no bout records. Proceeding with API data and using safe defaults to avoid division by zero.")
+                    total_bouts = 1
                 
                 stats = {
                     'name': player_data.get('strPlayer', fighter_name),
@@ -378,17 +573,44 @@ class BoxingAPI:
             except Exception as e:
                 print(f"⚠ Error parsing API data: {e}")
                 print(f"→ Trying local database...")
-        
-        # No API data found. If local DB has an entry, use it as a fallback
-        # (useful offline or for curated fighters). Otherwise return None.
-        if fighter_name in self.fighter_db:
+        # No structured API player data. Try RapidAPI schedule to detect
+        # recently announced or card-listed fighters (minimal safe defaults).
+        # First, try fetching richer fighter details from the Boxing Data API
+        # (RapidAPI) before falling back to schedule or curated DB.
+        details = self.search_rapidapi_fighter_details(fighter_name)
+        if details:
+            return details
+
+        schedule_match = self.search_rapidapi_schedule(fighter_name)
+        if schedule_match:
+            # Use conservative safe defaults so simulations can run without
+            # halting for missing curated data. These defaults avoid divide-by-zero.
+            stats = {
+                'name': fighter_name,
+                'wins': 1,
+                'losses': 0,
+                'draws': 0,
+                'total_bouts': 1,
+                'ko_wins': 0,
+                'height': 180,
+                'reach': 180,
+                'weight': 170,
+                'source': 'rapidapi.schedule'
+            }
+            print(f"✓ Created minimal stats for '{fighter_name}' from RapidAPI schedule fallback.")
+            return stats
+
+        # If RapidAPI schedule didn't find the fighter, optionally fall back
+        # to the curated local DB only when explicitly allowed via env var.
+        use_local_fallback = os.getenv('USE_LOCAL_DB_FALLBACK', 'true').lower() in ('1', 'true', 'yes')
+        if use_local_fallback and fighter_name in self.fighter_db:
             print(f"⚠ No API data for '{fighter_name}'; using local DB fallback.")
             stats = self.fighter_db[fighter_name].copy()
             stats['name'] = fighter_name
-            stats['source'] = 'rapidapi.com'
+            stats['source'] = 'local_db'
             return stats
 
-        print(f"✗ Fighter '{fighter_name}' not found in API or local DB.")
+        print(f"✗ Fighter '{fighter_name}' not found in API, RapidAPI schedule, or allowed local DB fallback.")
         return None
     
     def create_dataframe(self, fighter_name):
