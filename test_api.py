@@ -11,7 +11,16 @@ if response.status_code == 200:
     print("✅ API Working!")
     if data.get('player'):
         player = data['player'][0]
-        print(f"Fighter: {player['strPlayer']}")
-        print(f"Record: {player['intWin']}-{player['intLoss']}-{player['intDraw']}")
+        name = player.get('strPlayer', 'Unknown')
+        wins = player.get('intWin', 'N/A')
+        losses = player.get('intLoss', 'N/A')
+        draws = player.get('intDraw', 'N/A')
+        print(f"Fighter: {name}")
+        print(f"Record: {wins}-{losses}-{draws}")
+        # Print available keys for debugging if numeric fields missing
+        if wins == 'N/A' or losses == 'N/A':
+            print("⚠ Some record fields missing from API response. Available keys:")
+            for k in sorted(player.keys()):
+                print(f"  - {k}: {player[k]}")
 else:
     print(f"❌ Error: {response.status_code}")

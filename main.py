@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from multiprocessing import Pool, cpu_count
 from functools import partial
 import time
@@ -196,6 +197,20 @@ class BoxingAPI:
                 reach = self._estimate_reach(height)  # Estimate reach from height
                 
                 total_bouts = wins + losses + draws
+
+                # If API returns no bout data, prefer local DB when available
+                if total_bouts == 0:
+                    print("⚠ API returned no bout records. Checking local database for fallback...")
+                    if fighter_name in self.fighter_db:
+                        print("→ Using local database stats instead.")
+                        stats = self.fighter_db[fighter_name].copy()
+                        stats['name'] = fighter_name
+                        return stats
+                    else:
+                        # Avoid division by zero later by assuming one bout (win/loss unknown)
+                        print("→ No local data available; using safe defaults to avoid division by zero.")
+                        total_bouts = 1
+                        # keep wins/losses/draws as 0 and ko_wins as 0
                 
                 stats = {
                     'name': player_data.get('strPlayer', fighter_name),
@@ -358,16 +373,19 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
     
     if use_multiprocessing:
         # Use multiprocessing for faster computation
-        num_cores = cpu_count()
-        batch_size = n_simulations // num_cores
-        
+        num_cores = min(cpu_count(), n_simulations)
+
+        # Distribute simulations evenly across cores, handling remainder
+        base_batch = n_simulations // num_cores
+        remainder = n_simulations % num_cores
+        batch_sizes = [base_batch + (1 if i < remainder else 0) for i in range(num_cores)]
+
         print(f"Running {n_simulations:,} simulations across {num_cores} cores...")
-        print(f"Batch size per core: {batch_size:,}\n")
-        
-        # Create partial function with fixed parameters
-        simulate_func = partial(
-            simulate_batch,
-            batch_size,
+        print(f"Batch sizes per core: {[f'{b:,}' for b in batch_sizes]}\n")
+
+        # Prepare argument tuples for starmap
+        args = [(
+            batch_sizes[i],
             f1_stats,
             f2_stats,
             std_fighter1_win,
@@ -378,12 +396,12 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
             fighter2_win,
             ko_fighter1,
             ko_fighter2
-        )
-        
-        # Run simulations in parallel
+        ) for i in range(num_cores)]
+
+        # Run simulations in parallel using starmap
         with Pool(num_cores) as pool:
-            results_list = pool.map(simulate_func, range(num_cores))
-        
+            results_list = pool.starmap(simulate_batch, args)
+
         # Aggregate results
         fighter1_wins = sum(r[0] for r in results_list)
         fighter2_wins = sum(r[1] for r in results_list)
@@ -410,7 +428,8 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
     execution_time = end_time - start_time
     
     print(f"✓ Simulation completed in {execution_time:.2f} seconds")
-    print(f"  Throughput: {n_simulations/execution_time:,.0f} simulations/second\n")
+    throughput = n_simulations / execution_time if execution_time > 0 else float('inf')
+    print(f"  Throughput: {throughput:,.0f} simulations/second\n")
     
     # Calculate percentages
     fighter1_win_pct = (fighter1_wins / n_simulations) * 100
@@ -425,7 +444,7 @@ def monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=N, use_multip
         'fighter2_win_pct': fighter2_win_pct,
         'draw_pct': draw_pct,
         'execution_time': execution_time,
-        'throughput': n_simulations/execution_time
+        'throughput': (n_simulations / execution_time) if execution_time > 0 else float('inf')
     }
     
     return results
@@ -456,7 +475,7 @@ def plot_results(results, fighter1_name, fighter2_name):
     ax.set_axisbelow(True)
     
     # Format y-axis with comma separators
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{int(x):,}'))
     
     # Add value labels on top of bars
     for bar in bars:
@@ -510,13 +529,15 @@ def print_results(results, fighter1_name, fighter2_name):
     print(f"🥊 PREDICTION: {favorite} is favored to win ({odds:.2f}% probability)")
     print(f"📊 {underdog} has a {underdog_odds:.2f}% chance (underdog)")
     
-    # Calculate implied odds
-    fav_odds_decimal = 100 / odds
-    dog_odds_decimal = 100 / underdog_odds
+    # Calculate implied odds (guard against zero probabilities)
+    fav_odds_decimal = (100 / odds) if odds > 0 else float('inf')
+    dog_odds_decimal = (100 / underdog_odds) if underdog_odds > 0 else float('inf')
     
     print(f"\n💰 Implied Betting Odds:")
-    print(f"  {favorite}: {fav_odds_decimal:.2f} to 1")
-    print(f"  {underdog}: {dog_odds_decimal:.2f} to 1")
+    fav_str = f"{fav_odds_decimal:.2f} to 1" if odds > 0 else "N/A"
+    dog_str = f"{dog_odds_decimal:.2f} to 1" if underdog_odds > 0 else "N/A"
+    print(f"  {favorite}: {fav_str}")
+    print(f"  {underdog}: {dog_str}")
     print(f"{'='*60}\n")
 
 
