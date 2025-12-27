@@ -1,4 +1,4 @@
-# 🥊 BoxingMonteCarlo - AI-Powered Fight Prediction Engine
+# BoxingMonteCarlo - AI-Powered Fight Prediction Engine
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -7,13 +7,13 @@
 
 A sophisticated Monte Carlo simulation engine that predicts boxing match outcomes using statistical modeling, probability theory, and machine learning techniques. Powered by multiprocessing for lightning-fast predictions across millions of simulated fights.
 
-## 📊 Overview
+## Overview
 
 BoxingMonteCarlo leverages advanced computational statistics to model fight outcomes with inherent uncertainty. By running 100,000+ simulated fights with randomized parameters, the system generates probabilistic predictions based on historical performance, physical attributes, and knockout power.
 
 ![Monte Carlo Distribution](https://via.placeholder.com/800x400/22AA22/FFFFFF?text=Monte+Carlo+Fight+Outcome+Distribution)
 
-## 🎯 Features
+## Features
 
 - **🔢 Monte Carlo Simulation**: Run 100,000+ fight simulations in seconds
 - **⚡ Multi-threaded Processing**: Parallel computing using Python's multiprocessing
@@ -23,7 +23,7 @@ BoxingMonteCarlo leverages advanced computational statistics to model fight outc
 - **🥊 Real Fighter Stats**: Historical records, physical measurements, KO statistics
 - **🧮 Advanced Metrics**: Standard deviation calculations for height, reach, and performance
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -55,7 +55,7 @@ results = monte_carlo_simulation(fighter1_df, fighter2_df, n_simulations=100_000
 # Results: {'fighter1_win_pct': 56.23, 'fighter2_win_pct': 42.11, 'draw_pct': 1.66}
 ```
 
-## 🧮 Mathematical Foundation
+## Mathematical Foundation
 
 ### 1. Monte Carlo Method
 
@@ -288,7 +288,7 @@ The simulation has been validated against:
 - **Missing Variables**: Doesn't account for training camp, age, injuries, styles
 - **Sample Size**: Smaller bout histories have wider confidence intervals
 
-## 📈 Future Enhancements
+## Future Enhancements
 
 - [ ] Integration with live boxing APIs (BoxRec, ESPN)
 - [ ] Machine learning model for dynamic weight optimization
@@ -298,7 +298,7 @@ The simulation has been validated against:
 - [ ] Interactive web dashboard with real-time predictions
 - [ ] GPU acceleration with CUDA/PyTorch
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -310,22 +310,6 @@ git push origin feature/YourFeature
 # Open a Pull Request
 ```
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📧 Contact
-
-Your Name - [@yourhandle](https://twitter.com/yourhandle)
-
-Project Link: [https://github.com/yourusername/BoxingMonteCarlo](https://github.com/yourusername/BoxingMonteCarlo)
-
-## 🙏 Acknowledgments
-
-- Monte Carlo method pioneered by Stanislaw Ulam and John von Neumann
-- NumPy and scientific Python community
-- Boxing statistics from BoxRec and ESPN
-
 ---
 
-**⚠️ Disclaimer**: This tool is for educational and entertainment purposes only. Do not use for gambling or betting decisions. Past performance does not guarantee future results.
+**Disclaimer**: This tool is for educational and entertainment purposes only. Do not use for gambling or betting decisions. Past performance does not guarantee future results.
