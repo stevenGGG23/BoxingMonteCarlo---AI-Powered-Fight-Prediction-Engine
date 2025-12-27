@@ -11,7 +11,6 @@ A sophisticated Monte Carlo simulation engine that predicts boxing match outcome
 
 BoxingMonteCarlo leverages advanced computational statistics to model fight outcomes with inherent uncertainty. By running 100,000+ simulated fights with randomized parameters, the system generates probabilistic predictions based on historical performance, physical attributes, and knockout power.
 
-![Monte Carlo Distribution](https://via.placeholder.com/800x400/22AA22/FFFFFF?text=Monte+Carlo+Fight+Outcome+Distribution)
 
 ## Features
 
