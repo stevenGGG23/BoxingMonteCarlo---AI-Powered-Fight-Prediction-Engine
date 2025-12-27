@@ -298,18 +298,5 @@ The simulation has been validated against:
 - [ ] Interactive web dashboard with real-time predictions
 - [ ] GPU acceleration with CUDA/PyTorch
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-```bash
-# Fork the repository
-git checkout -b feature/YourFeature
-git commit -m "Add YourFeature"
-git push origin feature/YourFeature
-# Open a Pull Request
-```
-
----
 
 **Disclaimer**: This tool is for educational and entertainment purposes only. Do not use for gambling or betting decisions. Past performance does not guarantee future results.
