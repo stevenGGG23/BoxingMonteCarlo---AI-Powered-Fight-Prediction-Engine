@@ -4,8 +4,18 @@
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-**⚠️ Educational & Research Use Only** — Not intended for betting or financial decisions.
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/yourusername/boxing-montecarlo/graphs/commit-activity)
+[![GitHub issues](https://img.shields.io/github/issues/yourusername/boxing-montecarlo.svg)](https://github.com/yourusername/boxing-montecarlo/issues)
+[![GitHub stars](https://img.shields.io/github/stars/yourusername/boxing-montecarlo.svg?style=social)](https://github.com/yourusername/boxing-montecarlo/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/yourusername/boxing-montecarlo.svg?style=social)](https://github.com/yourusername/boxing-montecarlo/network)
+
+![Floyd-Mayweather-Jr-ducks-Philippines-Manny-Pacquiao-May-2-2015](https://github.com/user-attachments/assets/fc6a9598-e392-4687-bcfe-8d2446053702)
+![monte_carlo_price_1-636x310-2](https://github.com/user-attachments/assets/f157eb2a-23b6-4902-b31c-d94d584c7d9d)
+
+
 
 ---
 
