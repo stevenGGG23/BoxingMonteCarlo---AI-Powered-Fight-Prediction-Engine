@@ -2,8 +2,14 @@
 
 > A sophisticated Monte Carlo simulation engine for predicting boxing match outcomes using statistical modeling and historical fighter data.
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![HTML5](https://img.shields.io/badge/HTML5-Web-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+[![Java](https://img.shields.io/badge/Java-Programming-red.svg)](https://www.java.com/)
+[![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-150458.svg)](https://pandas.pydata.org/)
+[![Matplotlib](https://img.shields.io/badge/Matplotlib-Visualization-3776AB.svg)](https://matplotlib.org/)
+[![NumPy](https://img.shields.io/badge/NumPy-Scientific%20Computing-013243.svg)](https://numpy.org/)
+
 
 ![Floyd-Mayweather-Jr-ducks-Philippines-Manny-Pacquiao-May-2-2015](https://github.com/user-attachments/assets/fc6a9598-e392-4687-bcfe-8d2446053702)
 ![monte_carlo_price_1-636x310-2](https://github.com/user-attachments/assets/f157eb2a-23b6-4902-b31c-d94d584c7d9d)
