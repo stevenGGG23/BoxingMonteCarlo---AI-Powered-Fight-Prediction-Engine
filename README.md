@@ -1,4 +1,4 @@
-# 🥊 Boxing MonteCarlo
+# Boxing MonteCarlo
 
 > A sophisticated Monte Carlo simulation engine for predicting boxing match outcomes using statistical modeling and historical fighter data.
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 🎯 What It Does
+## What It Does
 
 BoxingMonteCarlo simulates thousands of virtual fights between boxers to predict win probabilities, draw likelihood, and knockout chances. By running 100,000+ simulations with statistical variance, it provides probability distributions rather than simple predictions.
 
@@ -33,7 +33,7 @@ BoxingMonteCarlo simulates thousands of virtual fights between boxers to predict
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -61,7 +61,7 @@ python main.py
 
 ---
 
-## 📐 How It Works
+## How It Works
 
 ### The Statistical Model
 
@@ -126,7 +126,7 @@ boxing-montecarlo/
 
 ---
 
-## 💡 Usage Examples
+## Usage Examples
 
 ### CLI: Select from Database
 ```
@@ -177,7 +177,7 @@ Speedup is approximately linear with core count (subject to Python overhead).
 
 ---
 
-## 🎓 Educational Notes
+## Educational Notes
 
 ### For Non-Technical Users
 Think of this as running thousands of "what-if" scenarios. Each fight is slightly different because fighters don't perform exactly the same every time. The percentages show how often each fighter won across all these virtual matches.
@@ -191,7 +191,7 @@ Think of this as running thousands of "what-if" scenarios. Each fight is slightl
 
 ---
 
-## 🚧 Current Limitations
+## Current Limitations
 
 The model uses simplified heuristics and could be improved with:
 
@@ -216,7 +216,7 @@ The model uses simplified heuristics and could be improved with:
 
 ---
 
-## 🧪 Testing & Reproducibility
+## Testing & Reproducibility
 
 ### Running Tests
 ```bash
@@ -238,7 +238,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) file f
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Areas needing help:
 
@@ -251,7 +251,7 @@ Please open an issue before starting major work.
 
 ---
 
-## ⚖️ Disclaimer
+## Disclaimer
 
 **This software is for educational and research purposes only.** Predictions are statistical estimates based on simplified models and historical data. They should not be used for:
 
@@ -263,7 +263,7 @@ Boxing is inherently unpredictable. No statistical model can account for all fac
 
 ---
 
-## 📚 References & Further Reading
+## References & Further Reading
 
 - [Monte Carlo Methods in Practice](https://en.wikipedia.org/wiki/Monte_Carlo_method)
 - [Elo Rating System](https://en.wikipedia.org/wiki/Elo_rating_system)
