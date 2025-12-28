@@ -5,6 +5,8 @@
 
 BoxingMonteCarlo is a Monte Carlo simulation engine that predicts boxing match outcomes using statistical modeling and multiprocessing. The application queries online boxing data (TheSportsDB) and — when the sports API returns no structured player data — searches RapidAPI's boxing events schedule as a fallback to detect recently announced fighters.
 
+![Floyd-Mayweather-Jr-ducks-Philippines-Manny-Pacquiao-May-2-2015](https://github.com/user-attachments/assets/d587f3a5-0783-4152-a464-dd96257a7f65)
+
 ## Overview
 
 By running many simulated fights (default: 100,000), the system generates probabilistic predictions using historical records, physical attributes, and knockout statistics. The project supports a small curated local fighter database as an optional fallback.
