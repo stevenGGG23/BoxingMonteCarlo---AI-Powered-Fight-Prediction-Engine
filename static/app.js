@@ -101,22 +101,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   populateSelect('fighter1', fighters, fighters[0]);
   populateSelect('fighter2', fighters, fighters[1] || fighters[0]);
 
-  // Ensure custom input fields exist (added in template)
-  const f1Custom = document.getElementById('fighter1_custom');
-  const f2Custom = document.getElementById('fighter2_custom');
+  // Custom input fields removed; use selects only
 
   const form = document.getElementById('sim-form');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     showStatus('Running simulation — this may take a few seconds...');
-    // Prefer custom input if provided, otherwise use the select
-    const f1_select_val = document.getElementById('fighter1').value;
-    const f2_select_val = document.getElementById('fighter2').value;
-    const f1_custom_val = f1Custom ? f1Custom.value.trim() : '';
-    const f2_custom_val = f2Custom ? f2Custom.value.trim() : '';
-
-    const f1 = f1_custom_val || f1_select_val;
-    const f2 = f2_custom_val || f2_select_val;
+    // Use selected fighter values (custom text inputs removed)
+    const f1 = document.getElementById('fighter1').value;
+    const f2 = document.getElementById('fighter2').value;
     const n = parseInt(document.getElementById('n_simulations').value || '10000', 10);
     // Multiprocessing is enabled by default on the server
     const use_mp = true;

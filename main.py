@@ -158,15 +158,299 @@ class BoxingAPI:
 
         # Fallback local database
         self.fighter_db = {
-            'Terence Crawford': {'wins': 42, 'losses': 0, 'draws': 0, 'total_bouts': 42, 'height': 178, 'reach': 183, 'ko_wins': 31, 'weight': 147},
-            'Anthony Joshua': {'wins': 28, 'losses': 3, 'draws': 0, 'total_bouts': 31, 'height': 198, 'reach': 208, 'ko_wins': 25, 'weight': 240},
-            'Jake Paul': {'wins': 9, 'losses': 1, 'draws': 0, 'total_bouts': 10, 'height': 185, 'reach': 193, 'ko_wins': 6, 'weight': 190},
-            'Tyson Fury': {'wins': 34, 'losses': 0, 'draws': 1, 'total_bouts': 35, 'height': 206, 'reach': 216, 'ko_wins': 24, 'weight': 270},
-            'Canelo Alvarez': {'wins': 62, 'losses': 2, 'draws': 2, 'total_bouts': 66, 'height': 173, 'reach': 179, 'ko_wins': 39, 'weight': 168},
-            'Mike Tyson': {'wins': 50, 'losses': 6, 'draws': 0, 'total_bouts': 56, 'height': 178, 'reach': 180, 'ko_wins': 44, 'weight': 220},
-            'Floyd Mayweather': {'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50, 'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147},
-            'Manny Pacquiao': {'wins': 62, 'losses': 7, 'draws': 2, 'total_bouts': 71, 'height': 167, 'reach': 172, 'ko_wins': 39, 'weight': 145},
-            'Evander Holyfield': {'wins': 44, 'losses': 12, 'draws': 2, 'total_bouts': 58, 'height': 188, 'reach': 198, 'ko_wins': 29, 'weight': 215}
+            # --- Your original core guys (updated with real stats) ---
+            'Terence Crawford': {
+                'wins': 42, 'losses': 0, 'draws': 0, 'total_bouts': 42,
+                'height': 173, 'reach': 188, 'ko_wins': 31, 'weight': 168
+            },
+            'Anthony Joshua': {
+                'wins': 29, 'losses': 4, 'draws': 0, 'total_bouts': 33,
+                'height': 198, 'reach': 208, 'ko_wins': 26, 'weight': 245
+            },
+            'Jake Paul': {
+                'wins': 9, 'losses': 1, 'draws': 0, 'total_bouts': 10,
+                'height': 185, 'reach': 193, 'ko_wins': 6, 'weight': 190
+            },
+            'Tyson Fury': {
+                'wins': 34, 'losses': 2, 'draws': 1, 'total_bouts': 37,
+                'height': 206, 'reach': 216, 'ko_wins': 24, 'weight': 270
+            },
+            'Canelo Alvarez': {
+                'wins': 63, 'losses': 3, 'draws': 2, 'total_bouts': 68,
+                'height': 171, 'reach': 179, 'ko_wins': 39, 'weight': 168
+            },
+            'Mike Tyson': {
+                'wins': 50, 'losses': 6, 'draws': 0, 'total_bouts': 56,
+                'height': 178, 'reach': 180, 'ko_wins': 44, 'weight': 220
+            },
+            'Floyd Mayweather': {
+                'wins': 50, 'losses': 0, 'draws': 0, 'total_bouts': 50,
+                'height': 173, 'reach': 183, 'ko_wins': 27, 'weight': 147
+            },
+            'Manny Pacquiao': {
+                'wins': 62, 'losses': 8, 'draws': 2, 'total_bouts': 72,
+                'height': 168, 'reach': 170, 'ko_wins': 39, 'weight': 147
+            },
+            'Evander Holyfield': {
+                'wins': 44, 'losses': 10, 'draws': 2, 'total_bouts': 56,
+                'height': 189, 'reach': 198, 'ko_wins': 29, 'weight': 215
+            },
+
+            # --- Heavyweight legends / stars ---
+
+            'Muhammad Ali': {
+                'wins': 56, 'losses': 5, 'draws': 0, 'total_bouts': 61,
+                'height': 191, 'reach': 198, 'ko_wins': 37, 'weight': 212
+            },
+            'Joe Frazier': {
+                'wins': 32, 'losses': 4, 'draws': 1, 'total_bouts': 37,
+                'height': 182, 'reach': 185, 'ko_wins': 27, 'weight': 205
+            },
+            'George Foreman': {
+                'wins': 76, 'losses': 5, 'draws': 0, 'total_bouts': 81,
+                'height': 191, 'reach': 199, 'ko_wins': 68, 'weight': 220
+            },
+            'Larry Holmes': {
+                'wins': 69, 'losses': 6, 'draws': 0, 'total_bouts': 75,
+                'height': 191, 'reach': 206, 'ko_wins': 44, 'weight': 210
+            },
+            'Lennox Lewis': {
+                'wins': 41, 'losses': 2, 'draws': 1, 'total_bouts': 44,
+                'height': 196, 'reach': 213, 'ko_wins': 32, 'weight': 245
+            },
+            'Wladimir Klitschko': {
+                'wins': 64, 'losses': 5, 'draws': 0, 'total_bouts': 69,
+                'height': 198, 'reach': 206, 'ko_wins': 53, 'weight': 245
+            },
+            'Vitali Klitschko': {
+                'wins': 45, 'losses': 2, 'draws': 0, 'total_bouts': 47,
+                'height': 201, 'reach': 201, 'ko_wins': 41, 'weight': 245
+            },
+            'Deontay Wilder': {
+                'wins': 43, 'losses': 3, 'draws': 1, 'total_bouts': 47,
+                'height': 201, 'reach': 211, 'ko_wins': 42, 'weight': 220
+            },
+            'Oleksandr Usyk': {
+                'wins': 24, 'losses': 0, 'draws': 0, 'total_bouts': 24,
+                'height': 191, 'reach': 198, 'ko_wins': 15, 'weight': 220
+            },
+            'Andy Ruiz Jr': {
+                'wins': 35, 'losses': 2, 'draws': 0, 'total_bouts': 37,
+                'height': 188, 'reach': 188, 'ko_wins': 22, 'weight': 260
+            },
+            'Riddick Bowe': {
+                'wins': 43, 'losses': 1, 'draws': 0, 'total_bouts': 44,
+                'height': 196, 'reach': 206, 'ko_wins': 33, 'weight': 240
+            },
+            'Sonny Liston': {
+                'wins': 50, 'losses': 4, 'draws': 0, 'total_bouts': 54,
+                'height': 185, 'reach': 213, 'ko_wins': 39, 'weight': 215
+            },
+            'Joe Louis': {
+                'wins': 66, 'losses': 3, 'draws': 0, 'total_bouts': 69,
+                'height': 188, 'reach': 193, 'ko_wins': 52, 'weight': 205
+            },
+            'Rocky Marciano': {
+                'wins': 49, 'losses': 0, 'draws': 0, 'total_bouts': 49,
+                'height': 180, 'reach': 173, 'ko_wins': 43, 'weight': 188
+            },
+
+            # --- Middle / super-middle / light-heavy stars ---
+
+            'Gennady Golovkin': {
+                'wins': 42, 'losses': 2, 'draws': 1, 'total_bouts': 45,
+                'height': 179, 'reach': 178, 'ko_wins': 37, 'weight': 160
+            },
+            'Andre Ward': {
+                'wins': 32, 'losses': 0, 'draws': 0, 'total_bouts': 32,
+                'height': 183, 'reach': 180, 'ko_wins': 16, 'weight': 175
+            },
+            'Bernard Hopkins': {
+                'wins': 55, 'losses': 8, 'draws': 2, 'total_bouts': 65,
+                'height': 185, 'reach': 191, 'ko_wins': 32, 'weight': 175
+            },
+            'Roy Jones Jr': {
+                'wins': 66, 'losses': 9, 'draws': 0, 'total_bouts': 75,
+                'height': 180, 'reach': 188, 'ko_wins': 47, 'weight': 175
+            },
+            'James Toney': {
+                'wins': 77, 'losses': 10, 'draws': 3, 'total_bouts': 90,
+                'height': 178, 'reach': 190, 'ko_wins': 47, 'weight': 168
+            },
+            'David Benavidez': {
+                'wins': 30, 'losses': 0, 'draws': 0, 'total_bouts': 30,
+                'height': 187, 'reach': 189, 'ko_wins': 24, 'weight': 168
+            },
+            'Caleb Plant': {
+                'wins': 22, 'losses': 2, 'draws': 0, 'total_bouts': 24,
+                'height': 185, 'reach': 188, 'ko_wins': 13, 'weight': 168
+            },
+            'Dmitry Bivol': {
+                'wins': 23, 'losses': 0, 'draws': 0, 'total_bouts': 23,
+                'height': 183, 'reach': 183, 'ko_wins': 12, 'weight': 175
+            },
+            'Artur Beterbiev': {
+                'wins': 20, 'losses': 1, 'draws': 0, 'total_bouts': 21,
+                'height': 182, 'reach': 185, 'ko_wins': 20, 'weight': 175
+            },
+            'Joe Calzaghe': {
+                'wins': 46, 'losses': 0, 'draws': 0, 'total_bouts': 46,
+                'height': 183, 'reach': 185, 'ko_wins': 32, 'weight': 168
+            },
+            'Kelly Pavlik': {
+                'wins': 40, 'losses': 2, 'draws': 0, 'total_bouts': 42,
+                'height': 188, 'reach': 191, 'ko_wins': 34, 'weight': 160
+            },
+
+            # --- Welter / light-welter / lightweight stars ---
+
+            'Sugar Ray Leonard': {
+                'wins': 36, 'losses': 3, 'draws': 1, 'total_bouts': 40,
+                'height': 178, 'reach': 188, 'ko_wins': 25, 'weight': 147
+            },
+            'Sugar Ray Robinson': {
+                'wins': 174, 'losses': 19, 'draws': 6, 'total_bouts': 199,
+                'height': 180, 'reach': 185, 'ko_wins': 109, 'weight': 147
+            },
+            'Julio Cesar Chavez': {
+                'wins': 107, 'losses': 6, 'draws': 2, 'total_bouts': 115,
+                'height': 171, 'reach': 173, 'ko_wins': 86, 'weight': 140
+            },
+            'Oscar De La Hoya': {
+                'wins': 39, 'losses': 6, 'draws': 0, 'total_bouts': 45,
+                'height': 179, 'reach': 185, 'ko_wins': 30, 'weight': 147
+            },
+            'Shane Mosley': {
+                'wins': 49, 'losses': 10, 'draws': 1, 'total_bouts': 60,
+                'height': 175, 'reach': 178, 'ko_wins': 41, 'weight': 147
+            },
+            'Miguel Cotto': {
+                'wins': 41, 'losses': 6, 'draws': 0, 'total_bouts': 47,
+                'height': 170, 'reach': 170, 'ko_wins': 33, 'weight': 154
+            },
+            'Errol Spence Jr': {
+                'wins': 28, 'losses': 1, 'draws': 0, 'total_bouts': 29,
+                'height': 177, 'reach': 183, 'ko_wins': 22, 'weight': 147
+            },
+            'Shakur Stevenson': {
+                'wins': 22, 'losses': 0, 'draws': 0, 'total_bouts': 22,
+                'height': 173, 'reach': 173, 'ko_wins': 10, 'weight': 135
+            },
+            'Terence Crawford (LW prime)': {
+                'wins': 29, 'losses': 0, 'draws': 0, 'total_bouts': 29,
+                'height': 173, 'reach': 188, 'ko_wins': 21, 'weight': 135
+            },
+
+            # --- Modern lightweights / super-lightweights ---
+
+            'Devin Haney': {
+                'wins': 33, 'losses': 1, 'draws': 0, 'total_bouts': 34,
+                'height': 175, 'reach': 180, 'ko_wins': 15, 'weight': 140
+            },
+            'Teofimo Lopez': {
+                'wins': 21, 'losses': 1, 'draws': 0, 'total_bouts': 22,
+                'height': 173, 'reach': 174, 'ko_wins': 13, 'weight': 140
+            },
+            'Ryan Garcia': {
+                'wins': 25, 'losses': 1, 'draws': 0, 'total_bouts': 26,
+                'height': 178, 'reach': 178, 'ko_wins': 20, 'weight': 140
+            },
+            'Josh Taylor': {
+                'wins': 19, 'losses': 2, 'draws': 0, 'total_bouts': 21,
+                'height': 178, 'reach': 177, 'ko_wins': 13, 'weight': 140
+            },
+            'Regis Prograis': {
+                'wins': 29, 'losses': 2, 'draws': 0, 'total_bouts': 31,
+                'height': 173, 'reach': 170, 'ko_wins': 24, 'weight': 140
+            },
+
+            # --- Smaller weight monsters ---
+
+            'Naoya Inoue': {
+                'wins': 32, 'losses': 0, 'draws': 0, 'total_bouts': 32,
+                'height': 165, 'reach': 171, 'ko_wins': 27, 'weight': 122
+            },
+            'Nonito Donaire': {
+                'wins': 43, 'losses': 8, 'draws': 0, 'total_bouts': 51,
+                'height': 170, 'reach': 174, 'ko_wins': 29, 'weight': 118
+            },
+            'Juan Manuel Marquez': {
+                'wins': 56, 'losses': 7, 'draws': 1, 'total_bouts': 64,
+                'height': 170, 'reach': 173, 'ko_wins': 40, 'weight': 135
+            },
+            'Marco Antonio Barrera': {
+                'wins': 67, 'losses': 7, 'draws': 0, 'total_bouts': 74,
+                'height': 168, 'reach': 178, 'ko_wins': 44, 'weight': 126
+            },
+            'Erik Morales': {
+                'wins': 52, 'losses': 9, 'draws': 0, 'total_bouts': 61,
+                'height': 173, 'reach': 183, 'ko_wins': 36, 'weight': 126
+            },
+
+            # --- Modern smaller guys / popular names ---
+
+            'Gervonta Davis': {
+                'wins': 30, 'losses': 0, 'draws': 1, 'total_bouts': 31,
+                'height': 166, 'reach': 171, 'ko_wins': 28, 'weight': 135
+            },
+            'Vasiliy Lomachenko': {
+                'wins': 18, 'losses': 3, 'draws': 0, 'total_bouts': 21,
+                'height': 170, 'reach': 166, 'ko_wins': 11, 'weight': 135
+            },
+            'Oscar Valdez': {
+                'wins': 32, 'losses': 2, 'draws': 0, 'total_bouts': 34,
+                'height': 166, 'reach': 168, 'ko_wins': 24, 'weight': 130
+            },
+            'Josh Warrington': {
+                'wins': 31, 'losses': 3, 'draws': 1, 'total_bouts': 35,
+                'height': 170, 'reach': 170, 'ko_wins': 8, 'weight': 126
+            },
+            'Roman Gonzalez': {
+                'wins': 51, 'losses': 4, 'draws': 0, 'total_bouts': 55,
+                'height': 160, 'reach': 163, 'ko_wins': 41, 'weight': 115
+            },
+
+            # --- Charlo / PBC guys etc ---
+
+            'Jermell Charlo': {
+                'wins': 35, 'losses': 2, 'draws': 1, 'total_bouts': 38,
+                'height': 180, 'reach': 185, 'ko_wins': 19, 'weight': 154
+            },
+            'Jermall Charlo': {
+                'wins': 33, 'losses': 1, 'draws': 0, 'total_bouts': 34,
+                'height': 183, 'reach': 187, 'ko_wins': 22, 'weight': 160
+            },
+            'Tony Harrison': {
+                'wins': 29, 'losses': 4, 'draws': 1, 'total_bouts': 34,
+                'height': 185, 'reach': 194, 'ko_wins': 21, 'weight': 154
+            },
+            'Keith Thurman': {
+                'wins': 30, 'losses': 1, 'draws': 0, 'total_bouts': 31,
+                'height': 171, 'reach': 175, 'ko_wins': 22, 'weight': 147
+            },
+
+            # --- A few more fan-favorites to bulk it out ---
+
+            'Amir Khan': {
+                'wins': 34, 'losses': 6, 'draws': 0, 'total_bouts': 40,
+                'height': 173, 'reach': 180, 'ko_wins': 21, 'weight': 147
+            },
+            'Kell Brook': {
+                'wins': 40, 'losses': 3, 'draws': 0, 'total_bouts': 43,
+                'height': 175, 'reach': 175, 'ko_wins': 28, 'weight': 147
+            },
+            'Adrien Broner': {
+                'wins': 35, 'losses': 4, 'draws': 1, 'total_bouts': 40,
+                'height': 170, 'reach': 177, 'ko_wins': 24, 'weight': 140
+            },
+            'Tim Tszyu': {
+                'wins': 25, 'losses': 1, 'draws': 0, 'total_bouts': 26,
+                'height': 174, 'reach': 179, 'ko_wins': 17, 'weight': 154
+            },
+            'Vergil Ortiz Jr': {
+                'wins': 21, 'losses': 0, 'draws': 0, 'total_bouts': 21,
+                'height': 178, 'reach': 180, 'ko_wins': 21, 'weight': 154
+            }
         }
         # store debug info for last searches
         self.last_search_debug = {}

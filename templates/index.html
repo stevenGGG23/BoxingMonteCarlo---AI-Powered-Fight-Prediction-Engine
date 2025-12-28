@@ -293,6 +293,22 @@
       text-transform: capitalize;
     }
 
+    /* Fighter slot badge (non-interactive label above select) */
+    .fighter-badge {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 12px;
+    }
+
+    .btn-f1 { background: #e53e3e; }
+    .btn-f2 { background: #2b6cb0; }
+
     footer {
       text-align: center;
       color: white;
@@ -335,15 +351,17 @@
       <form id="sim-form">
         <div class="fighter-section">
           <div class="fighter-input">
-            <label>Fighter 1</label>
+            <div class="fighter-label-row">
+              <span class="fighter-badge btn-f1">Fighter 1</span>
+            </div>
             <select id="fighter1"></select>
-            <input id="fighter1_custom" type="text" placeholder="Or type a custom fighter name..." />
           </div>
-          
+
           <div class="fighter-input">
-            <label>Fighter 2</label>
+            <div class="fighter-label-row">
+              <span class="fighter-badge btn-f2">Fighter 2</span>
+            </div>
             <select id="fighter2"></select>
-            <input id="fighter2_custom" type="text" placeholder="Or type a custom fighter name..." />
           </div>
         </div>
 
@@ -503,21 +521,15 @@
       populateSelect('fighter1', fighters, fighters[0]);
       populateSelect('fighter2', fighters, fighters[1] || fighters[0]);
 
-      const f1Custom = document.getElementById('fighter1_custom');
-      const f2Custom = document.getElementById('fighter2_custom');
+      // Custom text inputs removed; use selects only
 
       const form = document.getElementById('sim-form');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         showStatus('Running simulation — this may take a few seconds...');
         
-        const f1_select_val = document.getElementById('fighter1').value;
-        const f2_select_val = document.getElementById('fighter2').value;
-        const f1_custom_val = f1Custom ? f1Custom.value.trim() : '';
-        const f2_custom_val = f2Custom ? f2Custom.value.trim() : '';
-
-        const f1 = f1_custom_val || f1_select_val;
-        const f2 = f2_custom_val || f2_select_val;
+        const f1 = document.getElementById('fighter1').value;
+        const f2 = document.getElementById('fighter2').value;
         const n = parseInt(document.getElementById('n_simulations').value || '10000', 10);
         const use_mp = true;
 
